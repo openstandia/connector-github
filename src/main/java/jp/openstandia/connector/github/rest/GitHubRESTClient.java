@@ -406,7 +406,7 @@ public class GitHubRESTClient implements GitHubClient {
             // Suppress fetching roleNames
             LOGGER.ok("[{0}] Suppress fetching associations because return partial attribute values is requested", instanceName);
 
-            Stream.of(ATTR_TEAMS, ATTR_ORGANIZATION_ROLE).forEach(attrName -> {
+            Stream.of(ATTR_TEAMS, ATTR_MAINTAINER_TEAMS, ATTR_ORGANIZATION_ROLE).forEach(attrName -> {
                 AttributeBuilder ab = new AttributeBuilder();
                 ab.setName(attrName).setAttributeValueCompleteness(AttributeValueCompleteness.INCOMPLETE);
                 ab.addValue(Collections.EMPTY_LIST);
@@ -419,23 +419,32 @@ public class GitHubRESTClient implements GitHubClient {
                 LOGGER.ok("[{0}] Suppress fetching associations because returned by default is true", instanceName);
 
             } else {
-                if (shouldReturn(attributesToGet, ATTR_TEAMS)) {
+                if (shouldReturn(attributesToGet, ATTR_TEAMS) || shouldReturn(attributesToGet, ATTR_MAINTAINER_TEAMS)) {
                     if (orgApiClient.isMember(userLogin)) {
                         // Fetch teams
-                        LOGGER.ok("[{0}] Fetching roles because attributes to get is requested", instanceName);
+                        LOGGER.ok("[{0}] Fetching teams because attributes to get is requested", instanceName);
 
                         try {
                             // Fetch teams by user's login name
                             // It's supported by GraphQL API only...
-                            List<String> teams = orgApiClient.listTeams(userLogin, queryPageSize)
-                                    .toList()
-                                    .stream()
+                            List<GraphQLTeamEdge> allTeams = orgApiClient.listTeams(userLogin, queryPageSize)
+                                    .toList();
+
+                            List<String> memberTeams = allTeams.stream()
+                                    .filter(t -> t.node.role.equals("MEMBER"))
                                     .map(t -> t.node.databaseId + ":" + t.node.id)
                                     .collect(Collectors.toList());
-                            builder.addAttribute(ATTR_TEAMS, teams);
+
+                            List<String> maintainerTeams = allTeams.stream()
+                                    .filter(t -> t.node.role.equals("MAINTAINER"))
+                                    .map(t -> t.node.databaseId + ":" + t.node.id)
+                                    .collect(Collectors.toList());
+
+                            builder.addAttribute(ATTR_TEAMS, memberTeams);
+                            builder.addAttribute(ATTR_MAINTAINER_TEAMS, maintainerTeams);
 
                         } catch (IOException e) {
-                            throw new ConnectorIOException("Failed to fetch GitHub teams by user's login naem");
+                            throw new ConnectorIOException("Failed to fetch GitHub teams by user's login name");
                         }
                     }
                 }

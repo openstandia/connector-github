@@ -9,7 +9,7 @@ import java.util.function.Function;
  * @author Hiroyuki Wada
  */
 public class GraphQLTeamSearchBuilder extends GraphQLSearchBuilder<GraphQLOrganization, GraphQLTeamEdge, GraphQLTeamSearchVariables> {
-    private final String query = "query($login: String!, $userLogin: String!,$first: Int!, $after: String) {\n" +
+    private final String query = "query($login: String!, $userLogin: String!, $first: Int!, $after: String) {\n" +
             "  organization(login: $login) {\n" +
             "    id\n" +
             "    login\n" +
@@ -28,6 +28,12 @@ public class GraphQLTeamSearchBuilder extends GraphQLSearchBuilder<GraphQLOrgani
             "          id\n" +
             "          databaseId\n" +
             "          slug\n" +
+            "          members(query: $userLogin) {\n" +
+            "            totalCount\n" +
+            "            edges {\n" +
+            "              role\n" +
+            "            }\n" +
+            "          }\n" +
             "        }\n" +
             "      }\n" +
             "    }\n" +

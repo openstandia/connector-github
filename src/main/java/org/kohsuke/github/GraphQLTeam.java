@@ -13,4 +13,7 @@ public class GraphQLTeam extends GraphQLNode {
 
     @JsonProperty("slug")
     public String slug;
+
+    @JsonProperty("role")
+    public String role;
 }
