@@ -428,15 +428,17 @@ public class GitHubRESTClient implements GitHubClient {
                             // Fetch teams by user's login name
                             // It's supported by GraphQL API only...
                             List<GraphQLTeamEdge> allTeams = orgApiClient.listTeams(userLogin, queryPageSize)
-                                    .toList();
+                                    .toList().stream()
+                                    .filter(t -> t.node.members.totalCount == 1)
+                                    .collect(Collectors.toList());
 
                             List<String> memberTeams = allTeams.stream()
-                                    .filter(t -> t.node.role.equals("MEMBER"))
+                                    .filter(t -> t.node.members.edges[0].role == GraphQLTeamMemberRole.MEMBER)
                                     .map(t -> t.node.databaseId + ":" + t.node.id)
                                     .collect(Collectors.toList());
 
                             List<String> maintainerTeams = allTeams.stream()
-                                    .filter(t -> t.node.role.equals("MAINTAINER"))
+                                    .filter(t -> t.node.members.edges[0].role == GraphQLTeamMemberRole.MAINTAINER)
                                     .map(t -> t.node.databaseId + ":" + t.node.id)
                                     .collect(Collectors.toList());
 

@@ -80,9 +80,7 @@ public class GitHubTeamHandler extends AbstractGitHubHandler {
         // Readonly
         builder.addAttributeInfo(
                 AttributeInfoBuilder.define(Name.NAME)
-                        .setRequired(false)
-                        .setCreateable(false)
-                        .setUpdateable(false)
+                        .setRequired(true)
                         .setNativeName(ATTR_SLUG)
                         .setSubtype(AttributeInfo.Subtypes.STRING_CASE_IGNORE)
                         .build());
