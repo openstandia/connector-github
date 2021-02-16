@@ -406,7 +406,7 @@ public class GitHubRESTClient implements GitHubClient {
             // Suppress fetching roleNames
             LOGGER.ok("[{0}] Suppress fetching associations because return partial attribute values is requested", instanceName);
 
-            Stream.of(ATTR_TEAMS).forEach(attrName -> {
+            Stream.of(ATTR_TEAMS, ATTR_ORGANIZATION_ROLE).forEach(attrName -> {
                 AttributeBuilder ab = new AttributeBuilder();
                 ab.setName(attrName).setAttributeValueCompleteness(AttributeValueCompleteness.INCOMPLETE);
                 ab.addValue(Collections.EMPTY_LIST);
@@ -437,6 +437,15 @@ public class GitHubRESTClient implements GitHubClient {
                         } catch (IOException e) {
                             throw new ConnectorIOException("Failed to fetch GitHub teams by user's login naem");
                         }
+                    }
+                }
+                if (shouldReturn(attributesToGet, ATTR_ORGANIZATION_ROLE)) {
+                    try {
+                        GHMembership membership = orgApiClient.getOrganizationMembership(userLogin);
+                        builder.addAttribute(ATTR_ORGANIZATION_ROLE, membership.getRole().name().toLowerCase());
+
+                    } catch (IOException ignore) {
+                        LOGGER.info("Failed to fetch GitHub organization membership for user: {0}, error: {1}", userLogin, ignore.getMessage());
                     }
                 }
             }
@@ -487,10 +496,17 @@ public class GitHubRESTClient implements GitHubClient {
     }
 
     @Override
-    public void assignTeams(String login, List<String> teams) {
+    public void assignTeams(String login, String teamRole, Collection<String> teams) {
         withAuth(() -> {
             for (String team : teams) {
-                orgApiClient.addTeamMembership(getTeamId(team), login);
+                try {
+                    GHTeam.Role role = GHTeam.Role.valueOf(teamRole.toUpperCase());
+
+                    orgApiClient.addTeamMembership(getTeamId(team), login, role);
+
+                } catch (IllegalArgumentException e) {
+                    throw new InvalidAttributeValueException("Invalid teamRole: " + teamRole);
+                }
             }
 
             return null;
@@ -498,7 +514,7 @@ public class GitHubRESTClient implements GitHubClient {
     }
 
     @Override
-    public void unassignTeams(String login, List<String> teams) {
+    public void unassignTeams(String login, Collection<String> teams) {
         withAuth(() -> {
             for (String team : teams) {
                 orgApiClient.removeTeamMembership(getTeamId(team), login);

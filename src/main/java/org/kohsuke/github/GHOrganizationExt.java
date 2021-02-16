@@ -186,8 +186,9 @@ public class GHOrganizationExt extends GHOrganization {
         return searchTeams(userLogin).list().withPageSize(pageSize);
     }
 
-    public void addTeamMembership(long teamId, String userLogin) throws IOException {
+    public void addTeamMembership(long teamId, String userLogin, GHTeam.Role teamRole) throws IOException {
         root.createRequest().method("PUT")
+                .with("role", teamRole.name().toLowerCase())
                 .withUrlPath(String.format("/organizations/%d/team/%d/memberships/%s", getId(), teamId, userLogin))
                 .send();
     }
@@ -222,5 +223,11 @@ public class GHOrganizationExt extends GHOrganization {
                 .with("role", organizationRole.name().toLowerCase())
                 .withUrlPath(String.format("/orgs/%s/memberships/%s", login, userLogin))
                 .send();
+    }
+
+    public GHMembership getOrganizationMembership(String userLogin) throws IOException {
+        return root.createRequest()
+                .withUrlPath(String.format("/orgs/%s/memberships/%s", login, userLogin))
+                .fetch(GHMembership.class);
     }
 }

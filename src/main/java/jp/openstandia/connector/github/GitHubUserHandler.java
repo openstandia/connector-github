@@ -21,9 +21,7 @@ import org.kohsuke.github.SCIMEmail;
 import org.kohsuke.github.SCIMName;
 import org.kohsuke.github.SCIMUser;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static jp.openstandia.connector.github.GitHubUtils.*;
@@ -55,7 +53,8 @@ public class GitHubUserHandler extends AbstractGitHubHandler {
     public static final String ATTR_ORGANIZATION_ROLE = "organizationRole";
 
     // Association
-    public static final String ATTR_TEAMS = "teams"; // team(databaseId)
+    public static final String ATTR_TEAMS = "teams"; // team(databaseId:nodeId)
+    public static final String ATTR_MAINTAINER_TEAMS = "maintainerTeams"; // team(databaseId:nodeId)
 
     public GitHubUserHandler(String instanceName, GitHubConfiguration configuration, GitHubClient client,
                              GitHubSchema schema) {
@@ -107,18 +106,28 @@ public class GitHubUserHandler extends AbstractGitHubHandler {
                 AttributeInfoBuilder.define(ATTR_SCIM_EXTERNAL_ID)
                         .setRequired(false)
                         .build());
-        builder.addAttributeInfo(
-                AttributeInfoBuilder.define(ATTR_ORGANIZATION_ROLE)
-                        .setRequired(false)
-                        .build());
 
         // Association
         builder.addAttributeInfo(
                 AttributeInfoBuilder.define(ATTR_TEAMS)
                         .setRequired(false)
                         .setMultiValued(true)
-                        // We define the team's UID as string with <teamId>:<nodeId> format
+                        // We define the team's UID as string with <databaseId>:<nodeId> format
                         // .setType(Integer.class)
+                        .setReturnedByDefault(false)
+                        .build());
+        builder.addAttributeInfo(
+                AttributeInfoBuilder.define(ATTR_MAINTAINER_TEAMS)
+                        .setRequired(false)
+                        .setMultiValued(true)
+                        // We define the team's UID as string with <databaseId>:<nodeId> format
+                        // .setType(Integer.class)
+                        .setReturnedByDefault(false)
+                        .build());
+        // TODO: Implement Organization Role schema?
+        builder.addAttributeInfo(
+                AttributeInfoBuilder.define(ATTR_ORGANIZATION_ROLE)
+                        .setRequired(false)
                         .setReturnedByDefault(false)
                         .build());
 
@@ -133,9 +142,6 @@ public class GitHubUserHandler extends AbstractGitHubHandler {
     public Uid create(Set<Attribute> attributes) {
         SCIMUser newUser = new SCIMUser();
         newUser.name = new SCIMName();
-
-        String login = null;
-        List<String> teams = null;
 
         for (Attribute attr : attributes) {
             if (attr.is(ATTR_SCIM_USER_NAME)) {
@@ -154,25 +160,12 @@ public class GitHubUserHandler extends AbstractGitHubHandler {
 
             } else if (attr.is(ATTR_SCIM_EXTERNAL_ID)) {
                 newUser.externalId = AttributeUtil.getStringValue(attr);
-
-            } else if (attr.is(Name.NAME)) {
-                login = AttributeUtil.getStringValue(attr);
-
-            } else if (attr.is(ATTR_TEAMS)) {
-                teams = attr.getValue().stream().map(v -> v.toString()).collect(Collectors.toList());
             }
         }
 
         Uid created = client.createUser(schema, newUser);
 
-        // Association
-        if (login != null && teams != null && !teams.isEmpty()) {
-            // Check the login is valid first using check organization membership REST API
-            if (client.isOrganizationMember(login)) {
-                // If it's valid userLogin, do assign the teams
-                client.assignTeams(login, teams);
-            }
-        }
+        // Association can't be constructed here because GitHub login is unknown yet.
 
         return created;
     }
@@ -185,8 +178,10 @@ public class GitHubUserHandler extends AbstractGitHubHandler {
         String scimGivenName = null;
         String scimFamilyName = null;
         String organizationRole = null;
-        List<String> addTeams = new ArrayList<>();
-        List<String> removeTeams = new ArrayList<>();
+        Set<String> addTeams = new HashSet<>();
+        Set<String> removeTeams = new HashSet<>();
+        Set<String> addMaintainerTeams = new HashSet<>();
+        Set<String> removeMaintainerTeams = new HashSet<>();
 
         for (AttributeDelta attr : modifications) {
             if (attr.is(Name.NAME)) {
@@ -209,10 +204,18 @@ public class GitHubUserHandler extends AbstractGitHubHandler {
 
             } else if (attr.is(ATTR_TEAMS)) {
                 if (attr.getValuesToAdd() != null) {
-                    addTeams = attr.getValuesToAdd().stream().map(v -> v.toString()).collect(Collectors.toList());
+                    addTeams = attr.getValuesToAdd().stream().map(v -> v.toString()).collect(Collectors.toSet());
                 }
                 if (attr.getValuesToRemove() != null) {
-                    removeTeams = attr.getValuesToRemove().stream().map(v -> v.toString()).collect(Collectors.toList());
+                    removeTeams = attr.getValuesToRemove().stream().map(v -> v.toString()).collect(Collectors.toSet());
+                }
+
+            } else if (attr.is(ATTR_MAINTAINER_TEAMS)) {
+                if (attr.getValuesToAdd() != null) {
+                    addMaintainerTeams = attr.getValuesToAdd().stream().map(v -> v.toString()).collect(Collectors.toSet());
+                }
+                if (attr.getValuesToRemove() != null) {
+                    removeMaintainerTeams = attr.getValuesToRemove().stream().map(v -> v.toString()).collect(Collectors.toSet());
                 }
             }
         }
@@ -222,7 +225,11 @@ public class GitHubUserHandler extends AbstractGitHubHandler {
         String userLogin = resolveUserLogin(uid, login);
 
         // Organization role and Association
-        if (userLogin != null && (!addTeams.isEmpty() || !removeTeams.isEmpty())) {
+        if (userLogin != null &&
+                (organizationRole != null ||
+                        !addTeams.isEmpty() || !removeTeams.isEmpty() ||
+                        !addMaintainerTeams.isEmpty() || !removeMaintainerTeams.isEmpty()
+                )) {
             // Check the userLogin is valid first using check organization membership REST API
             if (client.isOrganizationMember(userLogin)) {
                 // If it's valid userLogin, do update organization role and assign/unassign the teams
@@ -230,12 +237,12 @@ public class GitHubUserHandler extends AbstractGitHubHandler {
                     client.assignOrganizationRole(userLogin, organizationRole);
                 }
 
-                if (!addTeams.isEmpty()) {
-                    client.assignTeams(userLogin, addTeams);
-                }
-                if (!removeTeams.isEmpty()) {
-                    client.unassignTeams(userLogin, removeTeams);
-                }
+                TeamAssignmentResolver resolver = new TeamAssignmentResolver(addTeams, removeTeams, addMaintainerTeams, removeMaintainerTeams);
+
+                client.unassignTeams(userLogin, resolver.resolvedRemoveTeams);
+
+                client.assignTeams(userLogin, "member", resolver.resolvedAddTeams);
+                client.assignTeams(userLogin, "maintainer", resolver.resolvedAddMaitainerTeams);
             }
         }
 

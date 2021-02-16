@@ -23,6 +23,7 @@ import org.identityconnectors.framework.common.objects.ResultsHandler;
 import org.identityconnectors.framework.common.objects.Uid;
 import org.kohsuke.github.SCIMUser;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 
@@ -54,9 +55,9 @@ public interface GitHubClient {
 
     void assignOrganizationRole(String userLogin, String organizationRole);
 
-    void assignTeams(String login, List<String> teams);
+    void assignTeams(String login, String role, Collection<String> teams);
 
-    void unassignTeams(String login, List<String> teams);
+    void unassignTeams(String login, Collection<String> teams);
 
     // Team
 
