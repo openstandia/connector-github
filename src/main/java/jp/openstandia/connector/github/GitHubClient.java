@@ -40,7 +40,7 @@ public interface GitHubClient {
 
     Uid createUser(GitHubSchema schema, SCIMUser scimUser) throws AlreadyExistsException;
 
-    Uid updateUser(GitHubSchema schema, Uid uid, String scimUserName, String scimEmail, String scimGivenName, String scimFamilyName, OperationOptions options) throws UnknownUidException;
+    String updateUser(GitHubSchema schema, Uid uid, String scimUserName, String scimEmail, String scimGivenName, String scimFamilyName, String login, OperationOptions options) throws UnknownUidException;
 
     void deleteUser(GitHubSchema schema, Uid uid, OperationOptions options) throws UnknownUidException;
 
@@ -60,9 +60,9 @@ public interface GitHubClient {
 
     // Team
 
-    Uid createTeam(GitHubSchema schema, String teamName, String description, String privacy, Long parentTeamId) throws AlreadyExistsException;
+    Uid createTeam(GitHubSchema schema, String teamName, String description, String privacy, Long parentTeamDatabaseId) throws AlreadyExistsException;
 
-    Uid updateTeam(GitHubSchema schema, Uid uid, String teamName, String description, String privacy, Long parentTeamId, OperationOptions options) throws UnknownUidException;
+    Uid updateTeam(GitHubSchema schema, Uid uid, String teamName, String description, String privacy, Long parentTeamId, boolean clearParent, OperationOptions options) throws UnknownUidException;
 
     void deleteTeam(GitHubSchema schema, Uid uid, OperationOptions options) throws UnknownUidException;
 

@@ -17,10 +17,10 @@ package jp.openstandia.connector.github;
 
 import org.identityconnectors.framework.common.exceptions.InvalidAttributeValueException;
 import org.identityconnectors.framework.common.objects.AttributeInfo;
+import org.identityconnectors.framework.common.objects.Name;
 import org.identityconnectors.framework.common.objects.OperationOptions;
 import org.identityconnectors.framework.common.objects.Uid;
-import org.kohsuke.github.GHTeam;
-import org.kohsuke.github.GraphQLTeamEdge;
+import org.kohsuke.github.*;
 
 import java.time.OffsetDateTime;
 import java.time.ZonedDateTime;
@@ -129,41 +129,117 @@ public class GitHubUtils {
         return list;
     }
 
+    public static Uid toUserUid(SCIMUser user) {
+        return new Uid(user.id, new Name(toUserName(user)));
+    }
+
+    public static String toUserName(SCIMUser user) {
+        return toUserName(null, user.userName);
+    }
+
+    public static String toUserName(String login, String scimUserName) {
+        if (login == null) {
+            // Need to return the format with <login>:<scimUserName>
+            // GitHub username policy is:
+            // Username may only contain alphanumeric characters or single hyphens, and cannot begin or end with a hyphen.
+            // So, return special "_unknown_" tag here because we can't determine the user login name yet
+            return UNKNOWN_USER_NAME + ":" + scimUserName;
+        }
+        return login + ":" + scimUserName;
+    }
+
+    public static final String UNKNOWN_USER_NAME = "_unknown_";
+
+    public static String getUserLogin(Uid uid) throws InvalidAttributeValueException {
+        return getUserLogin(uid.getNameHintValue());
+    }
+
+    public static String getUserSCIMUserName(Uid uid) throws InvalidAttributeValueException {
+        return getUserSCIMUserName(uid.getNameHintValue());
+    }
+
+    public static String getUserSCIMUserName(Name name) throws InvalidAttributeValueException {
+        return getUserSCIMUserName(name.getNameValue());
+    }
+
+    public static String getUserSCIMUserName(String nameValue) throws InvalidAttributeValueException {
+        return parseUserNameValue(nameValue)[1];
+    }
+
+    public static String getUserLogin(Name name) throws InvalidAttributeValueException {
+        return getUserLogin(name.getNameValue());
+    }
+
+    public static String getUserLogin(String nameValue) throws InvalidAttributeValueException {
+        return parseUserNameValue(nameValue)[0];
+    }
+
+    private static String[] parseUserNameValue(String nameValue) throws InvalidAttributeValueException {
+        String[] split = nameValue.split(":");
+        if (split.length != 2) {
+            throw new InvalidAttributeValueException("GitHub userName must be \"login:scimUserName\" format. value: " + nameValue);
+        }
+        return split;
+    }
+
     public static String toTeamUid(GHTeam team) {
         return toTeamUid(String.valueOf(team.getId()), team.getNodeId());
     }
 
     public static String toTeamUid(GraphQLTeamEdge teamEdge) {
-        return toTeamUid(teamEdge.node.databaseId.toString(), teamEdge.node.id);
+        return toTeamUid(teamEdge.node);
+    }
+
+    public static String toTeamUid(GraphQLTeam team) {
+        return toTeamUid(team.databaseId.toString(), team.id);
     }
 
     private static String toTeamUid(String databaseId, String nodeId) {
         return databaseId + ":" + nodeId;
     }
 
-    public static long getTeamId(Uid uid) {
-        return getTeamId(uid.getUidValue());
+    public static long getTeamDatabaseId(Uid uid) {
+        return getTeamDatabaseId(uid.getUidValue());
     }
 
-    public static long getTeamId(String uid) {
-        String[] split = uid.split(":");
-        if (split.length != 2) {
-            throw new InvalidAttributeValueException("Unexpected team UID: " + uid);
-        }
+    public static long getTeamDatabaseId(String uid) throws InvalidAttributeValueException {
+        String databaseId = parseTeamUidValue(uid)[0];
 
         try {
-            return Long.parseLong(split[0]);
+            return Long.parseLong(databaseId);
         } catch (NumberFormatException e) {
-            throw new InvalidAttributeValueException("Unexpected team UID: " + uid);
+            throw new InvalidAttributeValueException("Unexpected teamId: " + uid);
         }
     }
 
-    public static String getTeamNodeId(Uid uid) {
-        String[] split = uid.getUidValue().split(":");
-        if (split.length != 2) {
-            throw new InvalidAttributeValueException("Unexpected team UID: " + uid.getUidValue());
-        }
+    public static String getTeamNodeId(Uid uid) throws InvalidAttributeValueException {
+        return parseTeamUidValue(uid.getUidValue())[1];
+    }
 
-        return split[1];
+    private static String[] parseTeamUidValue(String uidValue) throws InvalidAttributeValueException {
+        String[] split = uidValue.split(":");
+        if (split.length != 2) {
+            throw new InvalidAttributeValueException("GitHub teamId must be \"databaseId:nodeId\" format. value: " + uidValue);
+        }
+        return split;
+    }
+
+    public static GHTeam.Privacy toGHTeamPrivacy(String privacy) throws InvalidAttributeValueException {
+        try {
+            // Validation
+            GraphQLTeamPrivacy gp = GraphQLTeamPrivacy.valueOf(privacy.toUpperCase());
+
+            // Need to convert
+            GHTeam.Privacy ghp = null;
+            if (gp == GraphQLTeamPrivacy.SECRET) {
+                ghp = GHTeam.Privacy.SECRET;
+            } else {
+                ghp = GHTeam.Privacy.CLOSED;
+            }
+            return ghp;
+
+        } catch (IllegalArgumentException e) {
+            throw new InvalidAttributeValueException("GitHub Team privacy must be \"visible\" or \"secret\": " + privacy);
+        }
     }
 }

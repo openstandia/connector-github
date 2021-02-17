@@ -4,17 +4,17 @@ import java.util.Map;
 import java.util.function.Function;
 
 /**
- * Search organization's teams by name with GitHub GraphQL API.
+ * Search organization's teams by member's login name with GitHub GraphQL API.
  *
  * @author Hiroyuki Wada
  */
-public class GraphQLTeamSearchBuilder extends GraphQLSearchBuilder<GraphQLOrganization, GraphQLTeamEdge, GraphQLTeamSearchVariables> {
-    private final String query = "query($login: String!, $teamName: String!, $first: Int!, $after: String) {\n" +
+public class GraphQLTeamByMemberSearchBuilder extends GraphQLSearchBuilder<GraphQLOrganization, GraphQLTeamEdge, GraphQLTeamByMemberSearchVariables> {
+    private final String query = "query($login: String!, $userLogin: String!, $first: Int!, $after: String) {\n" +
             "  organization(login: $login) {\n" +
             "    id\n" +
             "    login\n" +
             "    databaseId\n" +
-            "    teams(query: $teamName, first: $first, after: $after) {\n" +
+            "    teams(userLogins: [$userLogin], first: $first, after: $after) {\n" +
             "      totalCount\n" +
             "      pageInfo {\n" +
             "        endCursor\n" +
@@ -27,13 +27,12 @@ public class GraphQLTeamSearchBuilder extends GraphQLSearchBuilder<GraphQLOrgani
             "        node {\n" +
             "          id\n" +
             "          databaseId\n" +
-            "          name\n" +
             "          slug\n" +
-            "          description\n" +
-            "          privacy\n" +
-            "          parentTeam {\n" +
-            "            id\n" +
-            "            databaseId\n" +
+            "          members(query: $userLogin) {\n" +
+            "            totalCount\n" +
+            "            edges {\n" +
+            "              role\n" +
+            "            }\n" +
             "          }\n" +
             "        }\n" +
             "      }\n" +
@@ -41,10 +40,10 @@ public class GraphQLTeamSearchBuilder extends GraphQLSearchBuilder<GraphQLOrgani
             "  }\n" +
             "}\n";
 
-    GraphQLTeamSearchBuilder(GitHub root, GHOrganization org, String teamName) {
+    GraphQLTeamByMemberSearchBuilder(GitHub root, GHOrganization org, String userLogin) {
         super(root, org, GraphQLOrganizationSearchResult.class);
         this.variables.login = org.login;
-        this.variables.teamName = teamName;
+        this.variables.userLogin = userLogin;
     }
 
     private static class GraphQLOrganizationSearchResult extends GraphQLSearchResult<GraphQLOrganization> {
@@ -67,8 +66,8 @@ public class GraphQLTeamSearchBuilder extends GraphQLSearchBuilder<GraphQLOrgani
     }
 
     @Override
-    protected GraphQLTeamSearchVariables initSearchVariables() {
-        return new GraphQLTeamSearchVariables();
+    protected GraphQLTeamByMemberSearchVariables initSearchVariables() {
+        return new GraphQLTeamByMemberSearchVariables();
     }
 
     @Override

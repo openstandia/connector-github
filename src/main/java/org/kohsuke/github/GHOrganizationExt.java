@@ -94,6 +94,13 @@ public class GHOrganizationExt extends GHOrganization {
         return u;
     }
 
+    public SCIMUser getSCIMUserByUserName(String scimUserName) throws IOException {
+        SCIMUser u = root.createRequest()
+                .withUrlPath(String.format("/scim/v2/organizations/%s/Users?filter=userName eq \"%s\"", login, scimUserName))
+                .fetch(SCIMUser.class);
+        return u;
+    }
+
     /**
      * Search users.
      *
@@ -147,7 +154,8 @@ public class GHOrganizationExt extends GHOrganization {
                 .toIterable(GHTeamExt[].class, item -> item.wrapUp(this));
     }
 
-    public GHTeam updateTeam(long teamId, String name, String description, GHTeam.Privacy privacy, Long parentTeamId) throws IOException {
+    public GHTeam updateTeam(long teamId, String name, String description, GHTeam.Privacy privacy, Long parentTeamId,
+                             boolean clearParent) throws IOException {
         Requester req = root.createRequest().method("PATCH");
 
         if (name != null) {
@@ -161,7 +169,7 @@ public class GHOrganizationExt extends GHOrganization {
         }
         if (parentTeamId != null) {
             req.with("parent_team_id", parentTeamId);
-        } else {
+        } else if (clearParent) {
             req.withNullable("parent_team_id", null);
         }
 
@@ -177,8 +185,14 @@ public class GHOrganizationExt extends GHOrganization {
                 .send();
     }
 
-    public GraphQLTeamSearchBuilder searchTeams(String userLogin) {
-        return new GraphQLTeamSearchBuilder(root, this, userLogin);
+    public GraphQLPagedSearchIterable<GraphQLOrganization, GraphQLTeamEdge> findTeam(String teamName, int pageSize) throws IOException {
+        return new GraphQLTeamSearchBuilder(root, this, teamName)
+                .list()
+                .withPageSize(pageSize);
+    }
+
+    public GraphQLTeamByMemberSearchBuilder searchTeams(String userLogin) {
+        return new GraphQLTeamByMemberSearchBuilder(root, this, userLogin);
     }
 
     public GraphQLPagedSearchIterable<GraphQLOrganization, GraphQLTeamEdge> listTeams(String userLogin, int pageSize)
@@ -214,7 +228,7 @@ public class GHOrganizationExt extends GHOrganization {
      * Set organization role to the user.
      * https://docs.github.com/en/rest/reference/orgs#set-organization-membership-for-a-user
      *
-     * @param userLogin GitHub username
+     * @param userLogin        GitHub username
      * @param organizationRole orgnization role (admin or member)
      * @throws IOException API error
      */

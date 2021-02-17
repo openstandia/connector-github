@@ -38,22 +38,22 @@ public class GitHubTeamHandler extends AbstractGitHubHandler {
     // Unique and unchangeable.
     // Don't use "id" here because it conflicts midpoint side.
     // The format is <databaseId>:<nodeId>.
-    private static final String ATTR_TEAM_ID_WITH_NODE_ID = "teamIdWithNodeId";
-
-    // Unique and unchangeable.
-    public static final String ATTR_TEAM_ID = "teamId";
-    public static final String ATTR_NODE_ID = "nodeId";
+    private static final String ATTR_TEAM_DATABASE_ID_WITH_NODE_ID = "teamId";
 
     // Unique and changeable.
-    public static final String ATTR_NAME = "name";
+    private static final String ATTR_TEAM_NAME = "name";
 
     // Attributes
     public static final String ATTR_DESCRIPTION = "description";
-    public static final String ATTR_PRIVACY = "privacy"; // secret, closed
+    public static final String ATTR_PRIVACY = "privacy"; // secret, visible(closed in REST API)
 
     // Readonly
+    // Unique and unchangeable (generated).
+    public static final String ATTR_TEAM_DATABASE_ID = "databaseId";
     // Unique and changeable (generated from name).
     public static final String ATTR_SLUG = "slug";
+    // Unique and unchangeable (generated).
+    public static final String ATTR_TEAM_NODE_ID = "nodeId";
 
     // Association
     public static final String ATTR_PARENT_TEAM_ID = "parentTeamId";
@@ -73,24 +73,18 @@ public class GitHubTeamHandler extends AbstractGitHubHandler {
                         .setRequired(false) // Must be optional. It is not present for create operations
                         .setCreateable(false)
                         .setUpdateable(false)
-                        .setNativeName(ATTR_TEAM_ID_WITH_NODE_ID)
+                        .setNativeName(ATTR_TEAM_DATABASE_ID_WITH_NODE_ID)
                         .build());
 
-        // slug (__NAME__)
-        // Readonly
+        // name (__NAME__)
         builder.addAttributeInfo(
                 AttributeInfoBuilder.define(Name.NAME)
                         .setRequired(true)
-                        .setNativeName(ATTR_SLUG)
+                        .setNativeName(ATTR_TEAM_NAME)
                         .setSubtype(AttributeInfo.Subtypes.STRING_CASE_IGNORE)
                         .build());
 
         // Attributes
-        builder.addAttributeInfo(
-                AttributeInfoBuilder.define(ATTR_NAME)
-                        .setRequired(true)
-                        .setSubtype(AttributeInfo.Subtypes.STRING_CASE_IGNORE)
-                        .build());
         builder.addAttributeInfo(
                 AttributeInfoBuilder.define(ATTR_DESCRIPTION)
                         .setRequired(false)
@@ -102,14 +96,20 @@ public class GitHubTeamHandler extends AbstractGitHubHandler {
 
         // Readonly
         builder.addAttributeInfo(
-                AttributeInfoBuilder.define(ATTR_TEAM_ID)
+                AttributeInfoBuilder.define(ATTR_TEAM_DATABASE_ID)
                         .setRequired(false)
                         .setCreateable(false)
                         .setUpdateable(false)
                         .setType(Long.class)
                         .build());
         builder.addAttributeInfo(
-                AttributeInfoBuilder.define(ATTR_NODE_ID)
+                AttributeInfoBuilder.define(ATTR_SLUG)
+                        .setRequired(false)
+                        .setCreateable(false)
+                        .setUpdateable(false)
+                        .build());
+        builder.addAttributeInfo(
+                AttributeInfoBuilder.define(ATTR_TEAM_NODE_ID)
                         .setRequired(false)
                         .setCreateable(false)
                         .setUpdateable(false)
@@ -136,10 +136,10 @@ public class GitHubTeamHandler extends AbstractGitHubHandler {
         String name = null;
         String description = null;
         String privacy = null;
-        Long parentTeamId = null;
+        Long parentTeamDatabaseId = null;
 
         for (Attribute attr : attributes) {
-            if (attr.is(ATTR_NAME)) {
+            if (attr.is(Name.NAME)) {
                 name = AttributeUtil.getStringValue(attr);
 
             } else if (attr.is(ATTR_DESCRIPTION)) {
@@ -150,7 +150,7 @@ public class GitHubTeamHandler extends AbstractGitHubHandler {
 
             } else if (attr.is(ATTR_PARENT_TEAM_ID)) {
                 String s = AttributeUtil.getStringValue(attr);
-                parentTeamId = getTeamId(s);
+                parentTeamDatabaseId = getTeamDatabaseId(s);
             }
         }
 
@@ -158,7 +158,7 @@ public class GitHubTeamHandler extends AbstractGitHubHandler {
             throw new InvalidAttributeValueException("GitHub Team name is required");
         }
 
-        return client.createTeam(schema, name, description, privacy, parentTeamId);
+        return client.createTeam(schema, name, description, privacy, parentTeamDatabaseId);
     }
 
     @Override
@@ -167,9 +167,10 @@ public class GitHubTeamHandler extends AbstractGitHubHandler {
         String description = null;
         String privacy = null;
         Long parentTeamId = null;
+        boolean clearParent = false;
 
         for (AttributeDelta attr : modifications) {
-            if (attr.is(ATTR_NAME)) {
+            if (attr.is(Name.NAME)) {
                 name = AttributeDeltaUtil.getStringValue(attr);
 
             } else if (attr.is(ATTR_DESCRIPTION)) {
@@ -181,16 +182,18 @@ public class GitHubTeamHandler extends AbstractGitHubHandler {
             } else if (attr.is(ATTR_PARENT_TEAM_ID)) {
                 String s = AttributeDeltaUtil.getStringValue(attr);
                 if (s != null) {
-                    parentTeamId = getTeamId(s);
+                    parentTeamId = getTeamDatabaseId(s);
+                } else {
+                    clearParent = true;
                 }
             }
         }
 
-        Uid updated = client.updateTeam(schema, uid, name, description, privacy, parentTeamId, options);
+        Uid updated = client.updateTeam(schema, uid, name, description, privacy, parentTeamId, clearParent, options);
 
         // Detected changed NAME(slug)
-        if (!uid.getNameHintValue().equalsIgnoreCase(updated.getNameHintValue())) {
-            AttributeDelta newName = AttributeDeltaBuilder.build(Name.NAME, uid.getNameHintValue());
+        if (!uid.getNameHintValue().equals(updated.getNameHintValue())) {
+            AttributeDelta newName = AttributeDeltaBuilder.build(Name.NAME, updated.getNameHintValue());
             Set<AttributeDelta> sideEffects = new HashSet<>();
             sideEffects.add(newName);
 

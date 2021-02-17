@@ -43,7 +43,7 @@ public class MockClient implements GitHubClient {
     }
 
     @Override
-    public Uid updateUser(GitHubSchema schema, Uid uid, String scimUserName, String scimEmail, String scimGivenName, String scimFamilyName, OperationOptions options) throws UnknownUidException {
+    public String updateUser(GitHubSchema schema, Uid uid, String scimUserName, String scimEmail, String scimGivenName, String scimFamilyName, String login, OperationOptions options) throws UnknownUidException {
         return null;
     }
 
@@ -88,12 +88,12 @@ public class MockClient implements GitHubClient {
     }
 
     @Override
-    public Uid createTeam(GitHubSchema schema, String teamName, String description, String privacy, Long parentTeamId) throws AlreadyExistsException {
+    public Uid createTeam(GitHubSchema schema, String teamName, String description, String privacy, Long parentTeamDatabaseId) throws AlreadyExistsException {
         return null;
     }
 
     @Override
-    public Uid updateTeam(GitHubSchema schema, Uid uid, String teamName, String description, String privacy, Long parentTeamId, OperationOptions options) throws UnknownUidException {
+    public Uid updateTeam(GitHubSchema schema, Uid uid, String teamName, String description, String privacy, Long parentTeamId, boolean clearParent, OperationOptions options) throws UnknownUidException {
         return null;
     }
 

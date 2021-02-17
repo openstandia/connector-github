@@ -185,6 +185,11 @@ public class GitHubRESTClient implements GitHubClient {
             if (!status.isEmpty() && status.get(0).contains("409")) {
                 return new AlreadyExistsException(e);
             }
+
+            if (!status.isEmpty() && status.get(0).contains("422")) {
+                // Create Team API return 422 error if exists
+                return new AlreadyExistsException(e);
+            }
         }
 
         LOGGER.error(e, "Unexpected exception when calling GitHub API");
@@ -228,16 +233,27 @@ public class GitHubRESTClient implements GitHubClient {
         return withAuth(() -> {
             SCIMUser created = orgApiClient.createSCIMUser(newUser);
 
-            return new Uid(created.id, new Name(created.userName));
+            return toUserUid(created);
         });
     }
 
     @Override
-    public Uid updateUser(GitHubSchema schema, Uid uid, String scimUserName, String scimEmail, String scimGivenName, String scimFamilyName, OperationOptions options) throws UnknownUidException {
+    public String updateUser(GitHubSchema schema, Uid uid, String scimUserName, String scimEmail, String scimGivenName,
+                             String scimFamilyName, String login, OperationOptions options) throws UnknownUidException {
         return withAuth(() -> {
-            SCIMUser updated = orgApiClient.updateSCIMUser(uid.getUidValue(), scimUserName, scimEmail, scimGivenName, scimFamilyName);
-            if (updated == null) {
-                return null;
+            orgApiClient.updateSCIMUser(uid.getUidValue(), scimUserName, scimEmail, scimGivenName, scimFamilyName);
+
+            // Detected NAME is changed
+            String oldUserLogin = getUserLogin(uid);
+            String oldScimUserName = getUserSCIMUserName(uid);
+
+            if ((login != null && !oldUserLogin.equals(login))
+                    || (scimUserName != null && !oldScimUserName.equals(scimUserName))) {
+                String newLogin = login != null ? login : oldUserLogin;
+                String newScimUserName = scimUserName != null ? scimUserName : oldScimUserName;
+
+                // Return new NAME value
+                return toUserName(newLogin, newScimUserName);
             }
 
             return null;
@@ -287,12 +303,10 @@ public class GitHubRESTClient implements GitHubClient {
             SCIMUser user = orgApiClient.getSCIMUser(uid.getUidValue());
 
             // SCIM User doesn't contain database ID
-            // We need to use current database ID for the connectorObject as Name value to maintain the linking
-            String queryLogin = null;
-            Name name = uid.getNameHint();
-            if (name != null) {
-                queryLogin = name.getNameValue();
-            }
+            // We need to use NAME value in query Uid as user login.
+            // It means IDM can't detect when the user login is changed in GitHub side.
+            // To detect the situation, IDM need to do full reconciliation which calls getUsers method.
+            String queryLogin = getUserLogin(uid);
 
             handler.handle(toConnectorObject(schema, queryLogin, user, attributesToGet, allowPartialAttributeValues, queryPageSize));
 
@@ -304,32 +318,17 @@ public class GitHubRESTClient implements GitHubClient {
     public void getUser(GitHubSchema schema, Name name, ResultsHandler handler, OperationOptions options,
                         Set<String> attributesToGet, boolean allowPartialAttributeValues, int queryPageSize) {
         withAuth(() -> {
-            // Can't fetch directly... need to fetch all orgs members
-            LOGGER.warn("Fetching all external identities for query by Name(SCIM userName), Name: {0}", name.getNameValue());
+            String scimUserName = getUserSCIMUserName(name);
 
-            String queryLogin = name.getNameValue();
+            SCIMUser user = orgApiClient.getSCIMUserByUserName(scimUserName);
 
-            PagedIterator<GraphQLExternalIdentityEdge> iter = orgApiClient.listExternalIdentities(queryPageSize).iterator();
-            while (iter.hasNext()) {
-                GraphQLExternalIdentityEdge next = iter.next();
+            // SCIM User doesn't contain database ID
+            // We need to use NAME value in query Uid as user login.
+            // It means IDM can't detect when the user login is changed in GitHub side.
+            // To detect the situation, IDM need to do full reconciliation which calls getUsers method.
+            String queryLogin = getUserLogin(name);
 
-                if (next.node.user != null) {
-                    // Already linked
-                    if (next.node.user.login.equalsIgnoreCase(queryLogin)) {
-                        // Found
-                        handler.handle(toConnectorObject(schema, queryLogin, next, attributesToGet, allowPartialAttributeValues, queryPageSize));
-                        break;
-                    }
-
-                } else {
-                    // Not linked yet
-                    if (next.node.scimIdentity.username.equalsIgnoreCase(queryLogin)) {
-                        // Found
-                        handler.handle(toConnectorObject(schema, null, next, attributesToGet, allowPartialAttributeValues, queryPageSize));
-                        break;
-                    }
-                }
-            }
+            handler.handle(toConnectorObject(schema, queryLogin, user, attributesToGet, allowPartialAttributeValues, queryPageSize));
 
             return null;
         });
@@ -371,15 +370,11 @@ public class GitHubRESTClient implements GitHubClient {
                 // Always returns "scimUserId"
                 .setUid(scimUserId);
 
-        // Always returns "scimUserName" or "login" if resolved as Name value
-        String userLogin = resolveUserLogin(queryLogin, login, scimUserName);
-        builder.setName(userLogin);
+        // Always returns "_unknown_:<scimUserName>" or "<login>:<scimUserName>" as NAME
+        String userNameValue = resolveUserLogin(queryLogin, login, scimUserName);
+        builder.setName(userNameValue);
 
         // Attributes
-        if (shouldReturn(attributesToGet, ATTR_SCIM_USER_NAME) &&
-                scimUserName != null) {
-            builder.addAttribute(ATTR_SCIM_USER_NAME, scimUserName);
-        }
         if (shouldReturn(attributesToGet, ATTR_SCIM_EMAIL) &&
                 scimEmail != null) {
             builder.addAttribute(ATTR_SCIM_EMAIL, scimEmail);
@@ -393,8 +388,20 @@ public class GitHubRESTClient implements GitHubClient {
             builder.addAttribute(ATTR_SCIM_FAMILY_NAME, scimFamilyName);
         }
 
+        String userLogin = getUserLogin(userNameValue);
+
+        // Readonly
+        // We need to return user login always because it causes duplicate NAME if we don't return.
+        // IDM detects no data, then try to update NAME.
+        builder.addAttribute(ATTR_USER_LOGIN, userLogin);
+
+        if (shouldReturn(attributesToGet, ATTR_SCIM_USER_NAME) &&
+                scimUserName != null) {
+            builder.addAttribute(ATTR_SCIM_USER_NAME, scimUserName);
+        }
+
         if (allowPartialAttributeValues) {
-            // Suppress fetching roleNames
+            // Suppress fetching associations because they cost time and resource, also it consumes rate limit
             LOGGER.ok("[{0}] Suppress fetching associations because return partial attribute values is requested", instanceName);
 
             Stream.of(ATTR_TEAMS, ATTR_MAINTAINER_TEAMS, ATTR_ORGANIZATION_ROLE).forEach(attrName -> {
@@ -404,52 +411,66 @@ public class GitHubRESTClient implements GitHubClient {
                 builder.addAttribute(ab.build());
             });
 
-        } else {
-            if (attributesToGet == null) {
-                // Suppress fetching associations default
-                LOGGER.ok("[{0}] Suppress fetching associations because returned by default is true", instanceName);
+            return builder.build();
+        }
 
-            } else {
-                if (shouldReturn(attributesToGet, ATTR_TEAMS) || shouldReturn(attributesToGet, ATTR_MAINTAINER_TEAMS)) {
-                    if (orgApiClient.isMember(userLogin)) {
-                        // Fetch teams
-                        LOGGER.ok("[{0}] Fetching teams because attributes to get is requested", instanceName);
+        if (attributesToGet == null) {
+            // Suppress fetching associations default
+            LOGGER.ok("[{0}] Suppress fetching associations because returned by default is true", instanceName);
 
-                        try {
-                            // Fetch teams by user's login name
-                            // It's supported by GraphQL API only...
-                            List<GraphQLTeamEdge> allTeams = orgApiClient.listTeams(userLogin, queryPageSize)
-                                    .toList().stream()
-                                    .filter(t -> t.node.members.totalCount == 1)
-                                    .collect(Collectors.toList());
+            return builder.build();
+        }
 
-                            List<String> memberTeams = allTeams.stream()
-                                    .filter(t -> t.node.members.edges[0].role == GraphQLTeamMemberRole.MEMBER)
-                                    .map(GitHubUtils::toTeamUid)
-                                    .collect(Collectors.toList());
+        if (userLogin.equals(UNKNOWN_USER_NAME)) {
+            LOGGER.ok("[{0}] Suppress fetching associations because the user isn't complete the invitation", instanceName);
 
-                            List<String> maintainerTeams = allTeams.stream()
-                                    .filter(t -> t.node.members.edges[0].role == GraphQLTeamMemberRole.MAINTAINER)
-                                    .map(GitHubUtils::toTeamUid)
-                                    .collect(Collectors.toList());
+            return builder.build();
+        }
 
-                            builder.addAttribute(ATTR_TEAMS, memberTeams);
-                            builder.addAttribute(ATTR_MAINTAINER_TEAMS, maintainerTeams);
+        // Fetching associations if needed
 
-                        } catch (IOException e) {
-                            throw new ConnectorIOException("Failed to fetch GitHub teams by user's login name");
-                        }
-                    }
-                }
-                if (shouldReturn(attributesToGet, ATTR_ORGANIZATION_ROLE)) {
-                    try {
-                        GHMembership membership = orgApiClient.getOrganizationMembership(userLogin);
-                        builder.addAttribute(ATTR_ORGANIZATION_ROLE, membership.getRole().name().toLowerCase());
+        if (shouldReturn(attributesToGet, ATTR_TEAMS) || shouldReturn(attributesToGet, ATTR_MAINTAINER_TEAMS)) {
+            // Fetch teams
+            LOGGER.ok("[{0}] Fetching teams/maintainer teams because attributes to get is requested", instanceName);
 
-                    } catch (IOException ignore) {
-                        LOGGER.info("Failed to fetch GitHub organization membership for user: {0}, error: {1}", userLogin, ignore.getMessage());
-                    }
-                }
+            try {
+                // Fetch teams by user's login name
+                // It's supported by GraphQL API only...
+                // If the user is not found in the organization (leave by self or change their login name), the GraphAPI returns all teams unfortunately.
+                // That's why we do filtering by totalCount == 1 here.
+                List<GraphQLTeamEdge> allTeams = orgApiClient.listTeams(userLogin, queryPageSize)
+                        .toList().stream()
+                        .filter(t -> t.node.members.totalCount == 1)
+                        .collect(Collectors.toList());
+
+                List<String> memberTeams = allTeams.stream()
+                        .filter(t -> t.node.members.edges[0].role == GraphQLTeamMemberRole.MEMBER)
+                        .map(GitHubUtils::toTeamUid)
+                        .collect(Collectors.toList());
+
+                List<String> maintainerTeams = allTeams.stream()
+                        .filter(t -> t.node.members.edges[0].role == GraphQLTeamMemberRole.MAINTAINER)
+                        .map(GitHubUtils::toTeamUid)
+                        .collect(Collectors.toList());
+
+                builder.addAttribute(ATTR_TEAMS, memberTeams);
+                builder.addAttribute(ATTR_MAINTAINER_TEAMS, maintainerTeams);
+
+            } catch (IOException ignore) {
+                LOGGER.warn("Failed to fetch GitHub organization membership for user: {0}, error: {1}", userLogin, ignore.getMessage());
+                // Ignore the error, IDM try to reconcile the memberships
+            }
+        }
+
+        if (shouldReturn(attributesToGet, ATTR_ORGANIZATION_ROLE)) {
+            try {
+                GHMembership membership = orgApiClient.getOrganizationMembership(userLogin);
+                builder.addAttribute(ATTR_ORGANIZATION_ROLE, membership.getRole().name().toLowerCase());
+
+            } catch (IOException ignore) {
+                // If the user is not found (leave by self or change their login name), IDM will do discovery process
+                LOGGER.warn("Failed to fetch GitHub organization membership for user: {0}, error: {1}", userLogin, ignore.getMessage());
+                // Ignore the error, IDM try to reconcile the memberships
             }
         }
 
@@ -457,21 +478,13 @@ public class GitHubRESTClient implements GitHubClient {
     }
 
     private String resolveUserLogin(String queryLogin, String login, String scimUserName) {
-        if (queryLogin == null) {
-            if (login != null) {
-                return login;
-            } else {
-                return scimUserName;
-            }
-        } else {
-            if (login != null) {
-                return login;
-            } else if (queryLogin != null) {
-                return queryLogin;
-            } else {
-                return scimUserName;
-            }
+        if (login != null) {
+            return toUserName(login, scimUserName);
         }
+        if (queryLogin != null) {
+            return toUserName(queryLogin, scimUserName);
+        }
+        return toUserName(null, scimUserName);
     }
 
     @Override
@@ -504,7 +517,7 @@ public class GitHubRESTClient implements GitHubClient {
                 try {
                     GHTeam.Role role = GHTeam.Role.valueOf(teamRole.toUpperCase());
 
-                    orgApiClient.addTeamMembership(getTeamId(team), login, role);
+                    orgApiClient.addTeamMembership(getTeamDatabaseId(team), login, role);
 
                 } catch (IllegalArgumentException e) {
                     throw new InvalidAttributeValueException("Invalid teamRole: " + teamRole);
@@ -519,7 +532,7 @@ public class GitHubRESTClient implements GitHubClient {
     public void unassignTeams(String login, Collection<String> teams) {
         withAuth(() -> {
             for (String team : teams) {
-                orgApiClient.removeTeamMembership(getTeamId(team), login);
+                orgApiClient.removeTeamMembership(getTeamDatabaseId(team), login);
             }
 
             return null;
@@ -527,7 +540,7 @@ public class GitHubRESTClient implements GitHubClient {
     }
 
     @Override
-    public Uid createTeam(GitHubSchema schema, String teamName, String description, String privacy, Long parentTeamId) throws AlreadyExistsException {
+    public Uid createTeam(GitHubSchema schema, String teamName, String description, String privacy, Long parentTeamDatabaseId) throws AlreadyExistsException {
         return withAuth(() -> {
             GHTeamBuilder builder = orgApiClient.createTeam(teamName);
 
@@ -535,48 +548,39 @@ public class GitHubRESTClient implements GitHubClient {
                 builder.description(description);
             }
             if (privacy != null) {
-                try {
-                    GHTeam.Privacy p = GHTeam.Privacy.valueOf(privacy.toUpperCase());
-                    builder.privacy(p);
-
-                } catch (IllegalArgumentException e) {
-                    throw new InvalidAttributeValueException("Invalid privacy: " + privacy);
-                }
+                GHTeam.Privacy ghPrivacy = toGHTeamPrivacy(privacy);
+                builder.privacy(ghPrivacy);
             }
-            if (parentTeamId != null) {
-                builder.parentTeamId(parentTeamId);
+            if (parentTeamDatabaseId != null) {
+                builder.parentTeamId(parentTeamDatabaseId);
             }
 
             GHTeam created = builder.create();
 
             // To use for REST API and GraphQL API, we combine databaseId and nodeId
-            return new Uid(toTeamUid(created), new Name(created.getSlug()));
+            return new Uid(toTeamUid(created), new Name(created.getName()));
         });
     }
 
     @Override
-    public Uid updateTeam(GitHubSchema schema, Uid uid, String teamName, String description, String privacy, Long parentTeamId, OperationOptions options) throws UnknownUidException {
+    public Uid updateTeam(GitHubSchema schema, Uid uid, String teamName, String description, String privacy, Long parentTeamId,
+                          boolean clearParent, OperationOptions options) throws UnknownUidException {
         return withAuth(() -> {
-            GHTeam.Privacy p = null;
+            GHTeam.Privacy ghPrivacy = null;
             if (privacy != null) {
-                try {
-                    p = GHTeam.Privacy.valueOf(privacy.toUpperCase());
-
-                } catch (IllegalArgumentException e) {
-                    throw new InvalidAttributeValueException("Invalid privacy: " + privacy);
-                }
+                ghPrivacy = toGHTeamPrivacy(privacy);
             }
 
-            GHTeam updated = orgApiClient.updateTeam(getTeamId(uid), teamName, description, p, parentTeamId);
+            GHTeam updated = orgApiClient.updateTeam(getTeamDatabaseId(uid), teamName, description, ghPrivacy, parentTeamId, clearParent);
 
-            return new Uid(updated.getId() + ":" + updated.getNodeId(), new Name(updated.getSlug()));
+            return new Uid(toTeamUid(updated), new Name(updated.getName()));
         });
     }
 
     @Override
     public void deleteTeam(GitHubSchema schema, Uid uid, OperationOptions options) throws UnknownUidException {
         withAuth(() -> {
-            orgApiClient.deleteTeam(getTeamId(uid));
+            orgApiClient.deleteTeam(getTeamDatabaseId(uid));
 
             return null;
         });
@@ -597,7 +601,7 @@ public class GitHubRESTClient implements GitHubClient {
     @Override
     public void getTeam(GitHubSchema schema, Uid uid, ResultsHandler handler, OperationOptions options, Set<String> attributesToGet, boolean allowPartialAttributeValues, int queryPageSize) {
         withAuth(() -> {
-            GHTeamExt team = orgApiClient.getTeam(getTeamId(uid));
+            GHTeamExt team = orgApiClient.getTeam(getTeamDatabaseId(uid));
 
             handler.handle(toTeamConnectorObject(schema, team, attributesToGet, allowPartialAttributeValues, queryPageSize));
 
@@ -608,44 +612,88 @@ public class GitHubRESTClient implements GitHubClient {
     @Override
     public void getTeam(GitHubSchema schema, Name name, ResultsHandler handler, OperationOptions options, Set<String> attributesToGet, boolean allowPartialAttributeValues, int queryPageSize) {
         withAuth(() -> {
-            GHTeamExt team = orgApiClient.getTeam(name.getNameValue());
+            PagedIterator<GraphQLTeamEdge> iter = orgApiClient.findTeam(name.getNameValue(), queryPageSize).iterator();
+            while (iter.hasNext()) {
+                GraphQLTeamEdge team = iter.next();
+                if (team.node.name.equalsIgnoreCase(name.getNameValue())) {
+                    // Found
+                    handler.handle(toTeamConnectorObject(schema, team, attributesToGet, allowPartialAttributeValues, queryPageSize));
 
-            handler.handle(toTeamConnectorObject(schema, team, attributesToGet, allowPartialAttributeValues, queryPageSize));
+                    break;
+                }
+            }
 
             return null;
         });
     }
 
     private ConnectorObject toTeamConnectorObject(GitHubSchema schema, GHTeamExt team, Set<String> attributesToGet, boolean allowPartialAttributeValues, long queryPageSize) {
+        String teamId = toTeamUid(team);
+
+        String parentId = null;
+        if (team.getParent() != null) {
+            parentId = toTeamUid(team.getParent());
+        }
+
+        GraphQLTeamPrivacy privacy;
+        if (team.getPrivacy() == GHTeam.Privacy.SECRET.SECRET) {
+            privacy = GraphQLTeamPrivacy.SECRET;
+        } else {
+            privacy = GraphQLTeamPrivacy.VISIBLE;
+        }
+
+        return toTeamConnectorObject(schema, teamId, team.getId(), team.getNodeId(), team.getName(), team.getSlug(),
+                team.getDescription(), privacy, parentId,
+                attributesToGet, allowPartialAttributeValues, queryPageSize);
+    }
+
+    private ConnectorObject toTeamConnectorObject(GitHubSchema schema, GraphQLTeamEdge teamEdge, Set<String> attributesToGet, boolean allowPartialAttributeValues, long queryPageSize) {
+        GraphQLTeam team = teamEdge.node;
+
+        String teamId = toTeamUid(team);
+
+        String parentId = null;
+        if (team.parentTeam != null) {
+            parentId = toTeamUid(team.parentTeam);
+        }
+
+        return toTeamConnectorObject(schema, teamId, team.databaseId, team.id, team.name, team.slug,
+                team.description, team.privacy, parentId,
+                attributesToGet, allowPartialAttributeValues, queryPageSize);
+    }
+
+    private ConnectorObject toTeamConnectorObject(GitHubSchema schema, String teamId, long databaseId, String nodeId, String teamName,
+                                                  String slug, String description, GraphQLTeamPrivacy privacy, String parentId,
+                                                  Set<String> attributesToGet, boolean allowPartialAttributeValues, long queryPageSize) {
         final ConnectorObjectBuilder builder = new ConnectorObjectBuilder()
                 .setObjectClass(TEAM_OBJECT_CLASS)
                 // Always returns "teamId"
-                .setUid(team.getId() + ":" + team.getNodeId())
+                .setUid(teamId)
                 // Always returns "slug"
-                .setName(team.getSlug());
+                .setName(teamName);
 
         // Attributes
-        if (shouldReturn(attributesToGet, ATTR_NAME)) {
-            builder.addAttribute(ATTR_NAME, team.getName());
-        }
         if (shouldReturn(attributesToGet, ATTR_DESCRIPTION) &&
-                !StringUtil.isEmpty(team.getDescription())) {
-            builder.addAttribute(ATTR_DESCRIPTION, team.getDescription());
+                !StringUtil.isEmpty(description)) {
+            builder.addAttribute(ATTR_DESCRIPTION, description);
         }
         if (shouldReturn(attributesToGet, ATTR_PRIVACY)) {
-            builder.addAttribute(ATTR_PRIVACY, team.getPrivacy().name().toLowerCase());
+            builder.addAttribute(ATTR_PRIVACY, privacy.name().toLowerCase());
         }
         if (shouldReturn(attributesToGet, ATTR_PARENT_TEAM_ID) &&
-                team.getParent() != null) {
-            builder.addAttribute(ATTR_PARENT_TEAM_ID, team.getParent().getId() + ":" + team.getParent().getNodeId());
+                parentId != null) {
+            builder.addAttribute(ATTR_PARENT_TEAM_ID, parentId);
         }
 
         // Readonly
-        if (shouldReturn(attributesToGet, ATTR_TEAM_ID)) {
-            builder.addAttribute(ATTR_TEAM_ID, team.getId());
+        if (shouldReturn(attributesToGet, ATTR_TEAM_DATABASE_ID)) {
+            builder.addAttribute(ATTR_TEAM_DATABASE_ID, databaseId);
         }
-        if (shouldReturn(attributesToGet, ATTR_NODE_ID)) {
-            builder.addAttribute(ATTR_NODE_ID, team.getNodeId());
+        if (shouldReturn(attributesToGet, ATTR_SLUG)) {
+            builder.addAttribute(ATTR_SLUG, slug);
+        }
+        if (shouldReturn(attributesToGet, ATTR_TEAM_NODE_ID)) {
+            builder.addAttribute(ATTR_TEAM_NODE_ID, nodeId);
         }
 
         return builder.build();
