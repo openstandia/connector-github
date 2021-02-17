@@ -47,8 +47,8 @@ public class TeamAssignmentResolver {
 
         this.resolvedAddTeams = Collections.unmodifiableSet(addTeams);
 
+        // if same team is unassigned as member and assigned as maintainer, we assign as maintainer.
         Set<String> removeTeams = origRemoveTeams.stream()
-                // if same team is unassigned as member and assigned as maintainer, we assign as maintainer.
                 .filter(t -> !origAddMaintainerTeams.contains(t))
                 .collect(Collectors.toSet());
 
@@ -57,7 +57,8 @@ public class TeamAssignmentResolver {
                 .filter(t -> !addTeams.contains(t))
                 .collect(Collectors.toSet());
 
-        this.resolvedAddMaitainerTeams = Collections.unmodifiableSet(origAddMaintainerTeams);
+        this.resolvedAddMaitainerTeams = origAddMaintainerTeams;
+
         // If same team is unassigned for both teams and maintainer teams, we only unassign it one time.
         this.resolvedRemoveTeams = Collections.unmodifiableSet(
                 Stream.concat(removeTeams.stream(), removeMaintainerTeams.stream()).collect(Collectors.toSet())

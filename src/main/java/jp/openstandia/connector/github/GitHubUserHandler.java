@@ -21,7 +21,8 @@ import org.kohsuke.github.SCIMEmail;
 import org.kohsuke.github.SCIMName;
 import org.kohsuke.github.SCIMUser;
 
-import java.util.*;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import static jp.openstandia.connector.github.GitHubUtils.*;
@@ -41,8 +42,8 @@ public class GitHubUserHandler extends AbstractGitHubHandler {
     // Don't use "id" here because it conflicts midpoint side.
     private static final String ATTR_USER_ID = "scimUserId";
 
-    // Unique and changeable. This is GitHub login(username)
-    public static final String ATTR_USER_LOGIN = "login";
+    // Unique and changeable. This is GitHub login(username) and scimUserName(login:scimUserName).
+    public static final String ATTR_USER_NAME = "userName";
 
     // Attributes
     public static final String ATTR_SCIM_USER_NAME = "scimUserName";
@@ -52,9 +53,13 @@ public class GitHubUserHandler extends AbstractGitHubHandler {
     public static final String ATTR_SCIM_EXTERNAL_ID = "scimExternalId";
     public static final String ATTR_ORGANIZATION_ROLE = "organizationRole";
 
+    // Readonly
+    // Only fetched by GraphQL ExternalIdentity through all users query due to GitHub API limitation.
+    public static final String ATTR_USER_LOGIN = "login";
+
     // Association
-    public static final String ATTR_TEAMS = "teams"; // team(databaseId:nodeId)
-    public static final String ATTR_MAINTAINER_TEAMS = "maintainerTeams"; // team(databaseId:nodeId)
+    public static final String ATTR_TEAMS = "teams"; // List of teamId(databaseId:nodeId)
+    public static final String ATTR_MAINTAINER_TEAMS = "maintainerTeams"; // List of teamId(databaseId:nodeId)
 
     public GitHubUserHandler(String instanceName, GitHubConfiguration configuration, GitHubClient client,
                              GitHubSchema schema) {
@@ -75,20 +80,15 @@ public class GitHubUserHandler extends AbstractGitHubHandler {
                         .setNativeName(ATTR_USER_ID)
                         .build());
 
-        // login (__NAME__)
+        // userName (__NAME__)
         builder.addAttributeInfo(
                 AttributeInfoBuilder.define(Name.NAME)
-                        .setRequired(false)
-                        .setNativeName(ATTR_USER_LOGIN)
+                        .setRequired(true)
                         .setSubtype(AttributeInfo.Subtypes.STRING_CASE_IGNORE)
+                        .setNativeName(ATTR_USER_NAME)
                         .build());
 
         // attributes
-        builder.addAttributeInfo(
-                AttributeInfoBuilder.define(ATTR_SCIM_USER_NAME)
-                        .setRequired(true)
-                        .setSubtype(AttributeInfo.Subtypes.STRING_CASE_IGNORE)
-                        .build());
         builder.addAttributeInfo(
                 AttributeInfoBuilder.define(ATTR_SCIM_EMAIL)
                         .setRequired(true)
@@ -105,6 +105,22 @@ public class GitHubUserHandler extends AbstractGitHubHandler {
         builder.addAttributeInfo(
                 AttributeInfoBuilder.define(ATTR_SCIM_EXTERNAL_ID)
                         .setRequired(false)
+                        .build());
+
+        // Readonly
+        builder.addAttributeInfo(
+                AttributeInfoBuilder.define(ATTR_USER_LOGIN)
+                        .setRequired(false)
+                        .setCreateable(false)
+                        .setUpdateable(false)
+                        .setSubtype(AttributeInfo.Subtypes.STRING_CASE_IGNORE)
+                        .build());
+        builder.addAttributeInfo(
+                AttributeInfoBuilder.define(ATTR_SCIM_USER_NAME)
+                        .setRequired(false)
+                        .setCreateable(false)
+                        .setUpdateable(false)
+                        .setSubtype(AttributeInfo.Subtypes.STRING_CASE_IGNORE)
                         .build());
 
         // Association
@@ -144,8 +160,10 @@ public class GitHubUserHandler extends AbstractGitHubHandler {
         newUser.name = new SCIMName();
 
         for (Attribute attr : attributes) {
-            if (attr.is(ATTR_SCIM_USER_NAME)) {
-                newUser.userName = AttributeUtil.getStringValue(attr);
+            if (attr.is(Name.NAME)) {
+                String loginWithScimUserName = AttributeUtil.getStringValue(attr);
+                // Throw InvalidAttributeValueException if invalid format
+                newUser.userName = getUserSCIMUserName(loginWithScimUserName);
 
             } else if (attr.is(ATTR_SCIM_EMAIL)) {
                 SCIMEmail scimEmail = new SCIMEmail();
@@ -185,10 +203,22 @@ public class GitHubUserHandler extends AbstractGitHubHandler {
 
         for (AttributeDelta attr : modifications) {
             if (attr.is(Name.NAME)) {
-                login = AttributeDeltaUtil.getStringValue(attr);
+                // Detected modifying userName (e.g. completed the invitation by full reconciliation, update scimUserName)
+                String newLoginWithScimUserName = AttributeDeltaUtil.getStringValue(attr);
 
-            } else if (attr.is(ATTR_SCIM_USER_NAME)) {
-                scimUserName = AttributeDeltaUtil.getStringValue(attr);
+                // Detect scimUserName change
+                String newScimUserName = getUserSCIMUserName(newLoginWithScimUserName);
+                String oldScimUserName = getUserSCIMUserName(uid);
+                if (!newScimUserName.equals(oldScimUserName)) {
+                    scimUserName = newScimUserName;
+                }
+
+                // Detect user login change
+                String newLogin = getUserLogin(newLoginWithScimUserName);
+                String oldLogin = getUserLogin(uid);
+                if (!newLogin.equals(oldLogin)) {
+                    login = newLogin;
+                }
 
             } else if (attr.is(ATTR_SCIM_EMAIL)) {
                 scimEmail = AttributeDeltaUtil.getStringValue(attr);
@@ -220,9 +250,9 @@ public class GitHubUserHandler extends AbstractGitHubHandler {
             }
         }
 
-        client.updateUser(schema, uid, scimUserName, scimEmail, scimGivenName, scimFamilyName, options);
+        String newNameValue = client.updateUser(schema, uid, scimUserName, scimEmail, scimGivenName, scimFamilyName, login, options);
 
-        String userLogin = resolveUserLogin(uid, login);
+        String userLogin = resolveUserLogin(uid, newNameValue);
 
         // Organization role and Association
         if (userLogin != null &&
@@ -230,31 +260,47 @@ public class GitHubUserHandler extends AbstractGitHubHandler {
                         !addTeams.isEmpty() || !removeTeams.isEmpty() ||
                         !addMaintainerTeams.isEmpty() || !removeMaintainerTeams.isEmpty()
                 )) {
-            // Check the userLogin is valid first using check organization membership REST API
-            if (client.isOrganizationMember(userLogin)) {
-                // If it's valid userLogin, do update organization role and assign/unassign the teams
-                if (organizationRole != null) {
-                    client.assignOrganizationRole(userLogin, organizationRole);
-                }
 
-                TeamAssignmentResolver resolver = new TeamAssignmentResolver(addTeams, removeTeams, addMaintainerTeams, removeMaintainerTeams);
-
-                client.unassignTeams(userLogin, resolver.resolvedRemoveTeams);
-
-                client.assignTeams(userLogin, "member", resolver.resolvedAddTeams);
-                client.assignTeams(userLogin, "maintainer", resolver.resolvedAddMaitainerTeams);
+            // do update organization role
+            if (organizationRole != null) {
+                // If the user login is stale, it throws UnknownUidException.
+                // IDM handle the exception then do discovery process if needed.
+                client.assignOrganizationRole(userLogin, organizationRole);
             }
+
+            // assign/unassign the teams
+            TeamAssignmentResolver resolver = new TeamAssignmentResolver(addTeams, removeTeams, addMaintainerTeams, removeMaintainerTeams);
+
+            // If the user login is stale, it throws UnknownUidException.
+            // IDM handle the exception then do discovery process if needed.
+            client.unassignTeams(userLogin, resolver.resolvedRemoveTeams);
+            client.assignTeams(userLogin, "member", resolver.resolvedAddTeams);
+            client.assignTeams(userLogin, "maintainer", resolver.resolvedAddMaitainerTeams);
+        }
+
+        // Detect NAME changing
+        if (newNameValue != null) {
+            Set<AttributeDelta> sideEffects = new HashSet<>();
+            AttributeDelta newName = AttributeDeltaBuilder.build(Name.NAME, newNameValue);
+            sideEffects.add(newName);
+
+            return sideEffects;
         }
 
         return null;
     }
 
-    private String resolveUserLogin(Uid uid, String login) {
-        if (login != null) {
-            return login;
+    private String resolveUserLogin(Uid oldUid, String newNameValue) {
+        if (newNameValue != null) {
+            return getUserLogin(newNameValue);
         }
 
-        return uid.getNameHintValue();
+        String userLogin = getUserLogin(oldUid);
+        if (!userLogin.equals(UNKNOWN_USER_NAME)) {
+            return userLogin;
+        }
+        // Can't resolve yet due to not completed invitation
+        return null;
     }
 
     @Override

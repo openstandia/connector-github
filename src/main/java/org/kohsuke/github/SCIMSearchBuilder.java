@@ -1,6 +1,5 @@
 package org.kohsuke.github;
 
-
 import java.net.MalformedURLException;
 import java.util.HashMap;
 import java.util.List;
