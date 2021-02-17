@@ -24,7 +24,6 @@ import org.identityconnectors.framework.common.objects.Uid;
 import org.kohsuke.github.SCIMUser;
 
 import java.util.Collection;
-import java.util.List;
 import java.util.Set;
 
 /**

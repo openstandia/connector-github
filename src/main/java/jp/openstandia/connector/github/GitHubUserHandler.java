@@ -21,7 +21,8 @@ import org.kohsuke.github.SCIMEmail;
 import org.kohsuke.github.SCIMName;
 import org.kohsuke.github.SCIMUser;
 
-import java.util.*;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import static jp.openstandia.connector.github.GitHubUtils.*;

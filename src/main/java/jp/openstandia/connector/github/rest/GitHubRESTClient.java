@@ -22,6 +22,7 @@ import io.jsonwebtoken.SignatureAlgorithm;
 import jp.openstandia.connector.github.GitHubClient;
 import jp.openstandia.connector.github.GitHubConfiguration;
 import jp.openstandia.connector.github.GitHubSchema;
+import jp.openstandia.connector.github.GitHubUtils;
 import okhttp3.Credentials;
 import okhttp3.OkHttpClient;
 import okhttp3.Response;
@@ -51,8 +52,7 @@ import java.util.stream.Stream;
 
 import static jp.openstandia.connector.github.GitHubTeamHandler.*;
 import static jp.openstandia.connector.github.GitHubUserHandler.*;
-import static jp.openstandia.connector.github.GitHubUtils.getTeamId;
-import static jp.openstandia.connector.github.GitHubUtils.shouldReturn;
+import static jp.openstandia.connector.github.GitHubUtils.*;
 
 /**
  * GitHub client implementation which uses Java API for GitHub.
@@ -160,7 +160,6 @@ public class GitHubRESTClient implements GitHubClient {
     }
 
     protected ConnectorException handleApiException(Exception e) {
-        LOGGER.error(e, "Exception when calling github api");
 
         if (e instanceof GHFileNotFoundException) {
             GHFileNotFoundException gfe = (GHFileNotFoundException) e;
@@ -175,7 +174,8 @@ public class GitHubRESTClient implements GitHubClient {
             }
 
             if (!status.isEmpty() && status.get(0).contains("403")) {
-                return new ConnectionFailedException(e);
+                // Including Rate limit error
+                return new PermissionDeniedException(e);
             }
 
             if (!status.isEmpty() && status.get(0).contains("404")) {
@@ -187,7 +187,9 @@ public class GitHubRESTClient implements GitHubClient {
             }
         }
 
-        return new ConnectorIOException("Failed to call GitHub api", e);
+        LOGGER.error(e, "Unexpected exception when calling GitHub API");
+
+        return new ConnectorIOException("Failed to call GitHub API", e);
     }
 
     protected <T> T withAuth(Callable<T> callable) {
@@ -240,17 +242,6 @@ public class GitHubRESTClient implements GitHubClient {
 
             return null;
         });
-    }
-
-    protected boolean isPendingUser(String userId) {
-        return false;
-    }
-
-
-    protected void assignRole(String userId, List<String> roleIds) throws IOException {
-    }
-
-    protected void unassignRole(String userId, List<String> roleIds) throws IOException {
     }
 
     @Override
@@ -434,12 +425,12 @@ public class GitHubRESTClient implements GitHubClient {
 
                             List<String> memberTeams = allTeams.stream()
                                     .filter(t -> t.node.members.edges[0].role == GraphQLTeamMemberRole.MEMBER)
-                                    .map(t -> t.node.databaseId + ":" + t.node.id)
+                                    .map(GitHubUtils::toTeamUid)
                                     .collect(Collectors.toList());
 
                             List<String> maintainerTeams = allTeams.stream()
                                     .filter(t -> t.node.members.edges[0].role == GraphQLTeamMemberRole.MAINTAINER)
-                                    .map(t -> t.node.databaseId + ":" + t.node.id)
+                                    .map(GitHubUtils::toTeamUid)
                                     .collect(Collectors.toList());
 
                             builder.addAttribute(ATTR_TEAMS, memberTeams);
@@ -559,10 +550,9 @@ public class GitHubRESTClient implements GitHubClient {
             GHTeam created = builder.create();
 
             // To use for REST API and GraphQL API, we combine databaseId and nodeId
-            return new Uid(created.getId() + ":" + created.getNodeId(), new Name(created.getSlug()));
+            return new Uid(toTeamUid(created), new Name(created.getSlug()));
         });
     }
-
 
     @Override
     public Uid updateTeam(GitHubSchema schema, Uid uid, String teamName, String description, String privacy, Long parentTeamId, OperationOptions options) throws UnknownUidException {

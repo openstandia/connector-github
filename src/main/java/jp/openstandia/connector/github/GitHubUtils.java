@@ -19,6 +19,8 @@ import org.identityconnectors.framework.common.exceptions.InvalidAttributeValueE
 import org.identityconnectors.framework.common.objects.AttributeInfo;
 import org.identityconnectors.framework.common.objects.OperationOptions;
 import org.identityconnectors.framework.common.objects.Uid;
+import org.kohsuke.github.GHTeam;
+import org.kohsuke.github.GraphQLTeamEdge;
 
 import java.time.OffsetDateTime;
 import java.time.ZonedDateTime;
@@ -125,6 +127,18 @@ public class GitHubUtils {
             t = t.getCause();
         }
         return list;
+    }
+
+    public static String toTeamUid(GHTeam team) {
+        return toTeamUid(String.valueOf(team.getId()), team.getNodeId());
+    }
+
+    public static String toTeamUid(GraphQLTeamEdge teamEdge) {
+        return toTeamUid(teamEdge.node.databaseId.toString(), teamEdge.node.id);
+    }
+
+    private static String toTeamUid(String databaseId, String nodeId) {
+        return databaseId + ":" + nodeId;
     }
 
     public static long getTeamId(Uid uid) {

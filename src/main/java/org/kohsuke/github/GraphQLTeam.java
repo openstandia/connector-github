@@ -9,7 +9,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  */
 public class GraphQLTeam extends GraphQLNode {
     @JsonProperty("databaseId")
-    public String databaseId;
+    public Integer databaseId;
 
     @JsonProperty("slug")
     public String slug;

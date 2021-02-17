@@ -11,10 +11,13 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 public class SCIMSearchResult<T> {
     @JsonProperty("totalResults")
     public int totalResults;
+
     @JsonProperty("itemsPerPage")
     public int itemsPerPage;
+
     @JsonProperty("startIndex")
     public int startIndex;
+
     @JsonProperty("Resources")
     public T[] Resources;
 }
