@@ -334,6 +334,17 @@ public class GitHubRESTClient implements GitHubClient {
         });
     }
 
+    @Override
+    public List<String> getTeamIdsByUsername(String userLogin, int pageSize) {
+        return withAuth(() -> {
+            return orgApiClient.listTeams(userLogin, pageSize)
+                    .toList().stream()
+                    .filter(t -> t.node.members.totalCount == 1)
+                    .map(GitHubUtils::toTeamUid)
+                    .collect(Collectors.toList());
+        });
+    }
+
     private ConnectorObject toConnectorObject(GitHubSchema schema, String queryLogin, SCIMUser user,
                                               Set<String> attributesToGet, boolean allowPartialAttributeValues, int queryPageSize) {
 

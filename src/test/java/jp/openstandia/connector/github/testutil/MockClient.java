@@ -11,6 +11,7 @@ import org.identityconnectors.framework.common.objects.Uid;
 import org.kohsuke.github.SCIMUser;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Set;
 
 public class MockClient implements GitHubClient {
@@ -65,6 +66,11 @@ public class MockClient implements GitHubClient {
     @Override
     public void getUser(GitHubSchema schema, Name name, ResultsHandler handler, OperationOptions options, Set<String> attributesToGet, boolean allowPartialAttributeValues, int queryPageSize) {
 
+    }
+
+    @Override
+    public List<String> getTeamIdsByUsername(String userLogin, int pageSize) {
+        return null;
     }
 
     @Override
