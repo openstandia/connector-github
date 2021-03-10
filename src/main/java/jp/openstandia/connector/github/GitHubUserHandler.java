@@ -22,6 +22,7 @@ import org.kohsuke.github.SCIMName;
 import org.kohsuke.github.SCIMUser;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -305,6 +306,16 @@ public class GitHubUserHandler extends AbstractGitHubHandler {
 
     @Override
     public void delete(Uid uid, OperationOptions options) {
+        String userLogin = getUserLogin(uid);
+        if (!userLogin.equals(UNKNOWN_USER_NAME)) {
+            // Fix https://github.com/openstandia/connector-github/issues/6
+            // GitHub maintains the user's team association after deletion
+            // So, we need to remove the association first
+            List<String> teamIds = client.getTeamIdsByUsername(userLogin, configuration.getQueryPageSize());
+            client.unassignTeams(userLogin, teamIds);
+        }
+
+        // Finally, do delete the user
         client.deleteUser(schema, uid, options);
     }
 
