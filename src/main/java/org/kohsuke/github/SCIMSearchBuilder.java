@@ -14,11 +14,22 @@ public abstract class SCIMSearchBuilder<T> extends GHQueryBuilder<T> {
      */
     private final Class<? extends SCIMSearchResult<T>> receiverType;
 
+    protected final GHEnterpriseExt enterprise;
     protected final GHOrganization organization;
 
     SCIMSearchBuilder(GitHub root, GHOrganization org, Class<? extends SCIMSearchResult<T>> receiverType) {
         super(root);
+        this.enterprise = null;
         this.organization = org;
+        this.receiverType = receiverType;
+        req.withUrlPath(getApiUrl());
+        req.rateLimit(RateLimitTarget.SEARCH);
+    }
+
+    SCIMSearchBuilder(GitHub root, GHEnterpriseExt enterprise, Class<? extends SCIMSearchResult<T>> receiverType) {
+        super(root);
+        this.enterprise = enterprise;
+        this.organization = null;
         this.receiverType = receiverType;
         req.withUrlPath(getApiUrl());
         req.rateLimit(RateLimitTarget.SEARCH);

@@ -15,32 +15,32 @@
  */
 package jp.openstandia.connector.github;
 
-import jp.openstandia.connector.github.rest.GitHubRESTClient;
+import jp.openstandia.connector.github.rest.GitHubEMURESTClient;
 import org.identityconnectors.common.logging.Log;
 import org.identityconnectors.framework.common.exceptions.InvalidAttributeValueException;
 import org.identityconnectors.framework.common.objects.ObjectClass;
 import org.identityconnectors.framework.spi.ConnectorClass;
 
-import static jp.openstandia.connector.github.GitHubTeamHandler.TEAM_OBJECT_CLASS;
+import static jp.openstandia.connector.github.GitHubEMUGroupHandler.GROUP_OBJECT_CLASS;
 import static jp.openstandia.connector.github.GitHubUserHandler.USER_OBJECT_CLASS;
 
 /**
- * Connector implementation for GitHub connector.
+ * Connector implementation for GitHub EMU connector.
  *
  * @author Hiroyuki Wada
  */
-@ConnectorClass(configurationClass = GitHubConfiguration.class, displayNameKey = "NRI OpenStandia GitHub Connector")
-public class GitHubConnector extends AbstractGitHubConnector<GitHubConfiguration, GitHubSchema> {
+@ConnectorClass(configurationClass = GitHubEMUConfiguration.class, displayNameKey = "NRI OpenStandia GitHub EMU Connector")
+public class GitHubEMUConnector extends AbstractGitHubConnector<GitHubEMUConfiguration, GitHubEMUSchema> {
 
-    private static final Log LOG = Log.getLog(GitHubConnector.class);
+    private static final Log LOG = Log.getLog(GitHubEMUConnector.class);
 
     @Override
-    protected GitHubClient<GitHubSchema> newClient(GitHubConfiguration configuration) {
-        return new GitHubRESTClient(configuration);
+    protected GitHubClient<GitHubEMUSchema> newClient(GitHubEMUConfiguration configuration) {
+        return new GitHubEMURESTClient(configuration);
     }
 
     @Override
-    protected GitHubSchema newGitHubSchema(GitHubConfiguration configuration, GitHubClient client) {
-        return new GitHubSchema(configuration, client);
+    protected GitHubEMUSchema newGitHubSchema(GitHubEMUConfiguration configuration, GitHubClient<GitHubEMUSchema> client) {
+        return new GitHubEMUSchema(configuration, client);
     }
 }

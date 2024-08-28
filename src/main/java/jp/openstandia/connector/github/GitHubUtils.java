@@ -242,4 +242,13 @@ public class GitHubUtils {
             throw new InvalidAttributeValueException("GitHub Team privacy must be \"visible\" or \"secret\": " + privacy);
         }
     }
+
+    public static String toGroupId(SCIMEMUGroup group) {
+        return group.id;
+    }
+
+    public static String toGroupName(SCIMEMUGroup group) {
+        return group.displayName;
+    }
+
 }

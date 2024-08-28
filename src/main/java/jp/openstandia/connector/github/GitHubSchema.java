@@ -27,31 +27,30 @@ import java.util.Map;
  *
  * @author Hiroyuki Wada
  */
-public class GitHubSchema {
-
-    private final GitHubConfiguration configuration;
-    private final GitHubClient client;
+public class GitHubSchema extends AbstractGitHubSchema<GitHubConfiguration> {
 
     public final Schema schema;
     public final Map<String, AttributeInfo> userSchema;
     public final Map<String, AttributeInfo> roleSchema;
 
-    public GitHubSchema(GitHubConfiguration configuration, GitHubClient client) {
-        this.configuration = configuration;
-        this.client = client;
+    public GitHubSchema(GitHubConfiguration configuration, GitHubClient<GitHubSchema> client) {
+        super(configuration, client);
+
+        ObjectClassInfo userSchemaInfo = GitHubUserHandler.getUserSchema();
+        ObjectClassInfo roleSchemaInfo = GitHubTeamHandler.getRoleSchema();
 
         SchemaBuilder schemaBuilder = new SchemaBuilder(GitHubConnector.class);
 
-        ObjectClassInfo userSchemaInfo = GitHubUserHandler.getUserSchema();
-        schemaBuilder.defineObjectClass(userSchemaInfo);
+        buildSchema(schemaBuilder, userSchemaInfo,
+                (objectClassInfo) -> new GitHubUserHandler(configuration, client, this));
+        buildSchema(schemaBuilder, roleSchemaInfo,
+                (objectClassInfo) -> new GitHubTeamHandler(configuration, client, this));
 
-        ObjectClassInfo roleSchemaInfo = GitHubTeamHandler.getRoleSchema();
-        schemaBuilder.defineObjectClass(roleSchemaInfo);
-
+        // Define operation options
         schemaBuilder.defineOperationOption(OperationOptionInfoBuilder.buildAttributesToGet(), SearchOp.class);
         schemaBuilder.defineOperationOption(OperationOptionInfoBuilder.buildReturnDefaultAttributes(), SearchOp.class);
 
-        schema = schemaBuilder.build();
+        this.schema = schemaBuilder.build();
 
         Map<String, AttributeInfo> userSchemaMap = new HashMap<>();
         for (AttributeInfo info : userSchemaInfo.getAttributeInfo()) {
@@ -65,5 +64,10 @@ public class GitHubSchema {
 
         this.userSchema = Collections.unmodifiableMap(userSchemaMap);
         this.roleSchema = Collections.unmodifiableMap(roleSchemaMp);
+    }
+
+    @Override
+    public Schema getSchema() {
+        return schema;
     }
 }
