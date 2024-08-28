@@ -18,6 +18,7 @@ package jp.openstandia.connector.github;
 import org.identityconnectors.common.logging.Log;
 import org.identityconnectors.framework.common.objects.*;
 import org.identityconnectors.framework.common.objects.filter.AbstractFilterTranslator;
+import org.identityconnectors.framework.common.objects.filter.ContainsAllValuesFilter;
 import org.identityconnectors.framework.common.objects.filter.EqualsFilter;
 
 /**
@@ -52,6 +53,24 @@ public class GitHubFilterTranslator extends AbstractFilterTranslator<GitHubFilte
             return GitHubFilter.By((Name) attr);
         }
 
+        return null;
+    }
+
+    @Override
+    protected GitHubFilter createContainsAllValuesExpression(ContainsAllValuesFilter filter, boolean not) {
+        if (not) {
+            return null;
+        }
+        Attribute attr = filter.getAttribute();
+
+        // Unfortunately, GitHub EMU doesn't support "groups" attribute in User schema officially.
+        // So IDM try to fetch the groups which the user belongs to by using ContainsAllValuesFilter when GitHub EMU removes this unofficial feature.
+        if (objectClass.equals(GitHubEMUGroupHandler.GROUP_OBJECT_CLASS) &&
+                attr.getName().equals("members.User.value")) {
+            return GitHubFilter.ByMember(attr.getName(), GitHubFilter.FilterType.EXACT_MATCH, attr);
+        }
+
+        // Not supported searching by other attributes
         return null;
     }
 }

@@ -35,11 +35,14 @@ public class SCIMPageIterator<T extends SCIMSearchResult> implements Iterator<T>
         this.nextRequest = request;
     }
 
-    static <T extends SCIMSearchResult> SCIMPageIterator<T> create(GitHubClient client, Class<T> type, GitHubRequest request, int pageSize) {
+    static <T extends SCIMSearchResult> SCIMPageIterator<T> create(GitHubClient client, Class<T> type, GitHubRequest request, int pageSize, int pageOffset) {
 
         try {
             if (pageSize > 0) {
                 GitHubRequest.Builder<?> builder = request.toBuilder().with("count", pageSize);
+                if (pageOffset > 0) {
+                    builder.with("startIndex", pageOffset);
+                }
                 request = builder.build();
             }
 

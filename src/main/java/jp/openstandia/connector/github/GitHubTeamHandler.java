@@ -29,7 +29,7 @@ import static jp.openstandia.connector.github.GitHubUtils.*;
  *
  * @author Hiroyuki Wada
  */
-public class GitHubTeamHandler extends AbstractGitHubHandler {
+public class GitHubTeamHandler extends AbstractGitHubHandler<GitHubConfiguration, GitHubSchema> {
 
     public static final ObjectClass TEAM_OBJECT_CLASS = new ObjectClass("team");
 
@@ -58,9 +58,9 @@ public class GitHubTeamHandler extends AbstractGitHubHandler {
     // Association
     public static final String ATTR_PARENT_TEAM_ID = "parentTeamId";
 
-    public GitHubTeamHandler(String instanceName, GitHubConfiguration configuration, GitHubClient client,
+    public GitHubTeamHandler(GitHubConfiguration configuration, GitHubClient<GitHubSchema> client,
                              GitHubSchema schema) {
-        super(instanceName, configuration, client, schema);
+        super(configuration, client, schema);
     }
 
     public static ObjectClassInfo getRoleSchema() {

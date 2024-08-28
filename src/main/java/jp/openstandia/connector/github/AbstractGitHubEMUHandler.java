@@ -15,37 +15,24 @@
  */
 package jp.openstandia.connector.github;
 
-import jp.openstandia.connector.util.ObjectHandler;
 import jp.openstandia.connector.util.SchemaDefinition;
-import org.identityconnectors.framework.common.objects.*;
-
-import java.util.Set;
 
 /**
  * Base class for GitHub object handlers.
  *
  * @author Hiroyuki Wada
  */
-public abstract class AbstractGitHubHandler<T extends AbstractGitHubConfiguration, U extends AbstractGitHubSchema<T>> implements ObjectHandler {
+public abstract class AbstractGitHubEMUHandler extends AbstractGitHubHandler<GitHubEMUConfiguration, GitHubEMUSchema> {
 
-    protected String instanceName;
-    protected final T configuration;
-    protected final GitHubClient<U> client;
-    protected final U schema;
+    protected final SchemaDefinition schemaDefinition;
 
-    public AbstractGitHubHandler(T configuration, GitHubClient<U> client, U schema) {
-        this.configuration = configuration;
-        this.client = client;
-        this.schema = schema;
-    }
-
-    public ObjectHandler setInstanceName(String instanceName) {
-        this.instanceName = instanceName;
-        return this;
+    public AbstractGitHubEMUHandler(GitHubEMUConfiguration configuration, GitHubClient<GitHubEMUSchema> client, GitHubEMUSchema schema, SchemaDefinition schemaDefinition) {
+        super(configuration, client, schema);
+        this.schemaDefinition = schemaDefinition;
     }
 
     @Override
     public SchemaDefinition getSchemaDefinition() {
-        throw new UnsupportedOperationException();
+        return schemaDefinition;
     }
 }

@@ -15,6 +15,7 @@
  */
 package jp.openstandia.connector.github;
 
+import org.identityconnectors.framework.common.objects.Attribute;
 import org.identityconnectors.framework.common.objects.Name;
 import org.identityconnectors.framework.common.objects.Uid;
 
@@ -26,15 +27,36 @@ import org.identityconnectors.framework.common.objects.Uid;
 public class GitHubFilter {
     public final Uid uid;
     public final Name name;
+    public final FilterType filterType;
+    public final String attributeName;
+    public final Attribute attributeValue;
 
     private GitHubFilter(Uid uid) {
         this.uid = uid;
         this.name = null;
+        this.filterType = FilterType.EXACT_MATCH;
+        this.attributeName = null;
+        this.attributeValue = null;
     }
 
     private GitHubFilter(Name name) {
         this.uid = null;
         this.name = name;
+        this.filterType = FilterType.EXACT_MATCH;
+        this.attributeName = null;
+        this.attributeValue = null;
+    }
+
+    public enum FilterType {
+        EXACT_MATCH
+    }
+
+    private GitHubFilter(String attributeName, FilterType filterType, Attribute attributeValue) {
+        this.uid = null;
+        this.name = null;
+        this.attributeName = attributeName;
+        this.filterType = filterType;
+        this.attributeValue = attributeValue;
     }
 
     public static GitHubFilter By(Uid uid) {
@@ -45,6 +67,10 @@ public class GitHubFilter {
         return new GitHubFilter(name);
     }
 
+    public static GitHubFilter ByMember(String attributeName, FilterType filterType, Attribute attributeValue) {
+        return new GitHubFilter(attributeName, filterType, attributeValue);
+    }
+
     public boolean isByUid() {
         return uid != null;
     }
@@ -53,4 +79,7 @@ public class GitHubFilter {
         return name != null;
     }
 
+    public boolean isByMembers() {
+        return attributeName.equals("members.User.value") && filterType == FilterType.EXACT_MATCH;
+    }
 }

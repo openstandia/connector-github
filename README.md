@@ -1,10 +1,15 @@
-# GitHub  Connector
+# GitHub Connector
 
 ## Description
 
 [MidPoint](https://github.com/Evolveum/midpoint) Connector for [GitHub](https://github.com).
+There are two connectors in this connector bundle.
 
-## Capabilities and Features
+1. GitHub Connector: For GitHub Enterprise with personal accounts
+2. GitHub EMU Connector: For GitHub Enterprise with managed users
+
+## GitHub Connector
+### Capabilities and Features
 
 * Schema: YES
 * Provisioning: YES
@@ -12,6 +17,16 @@
 * Password: No
 * Activation: No
 * Script execution: No 
+
+## GitHub EMU Connector
+### Capabilities and Features
+
+* Schema: YES
+* Provisioning: YES
+* Live Synchronization: No
+* Password: No
+* Activation: YES
+* Script execution: No
 
 ## Build
 

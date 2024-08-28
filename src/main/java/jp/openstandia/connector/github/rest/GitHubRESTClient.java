@@ -19,14 +19,7 @@ import com.spotify.github.v3.clients.PKCS1PEMKey;
 import io.jsonwebtoken.JwtBuilder;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
-import jp.openstandia.connector.github.GitHubClient;
-import jp.openstandia.connector.github.GitHubConfiguration;
-import jp.openstandia.connector.github.GitHubSchema;
-import jp.openstandia.connector.github.GitHubUtils;
-import okhttp3.Credentials;
-import okhttp3.OkHttpClient;
-import okhttp3.Response;
-import okhttp3.Route;
+import jp.openstandia.connector.github.*;
 import org.identityconnectors.common.StringUtil;
 import org.identityconnectors.common.logging.Log;
 import org.identityconnectors.framework.common.exceptions.*;
@@ -35,8 +28,6 @@ import org.kohsuke.github.*;
 import org.kohsuke.github.extras.okhttp3.OkHttpConnector;
 
 import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.net.Proxy;
 import java.security.Key;
 import java.security.KeyFactory;
 import java.security.NoSuchAlgorithmException;
@@ -59,18 +50,17 @@ import static jp.openstandia.connector.github.GitHubUtils.*;
  *
  * @author Hiroyuki Wada
  */
-public class GitHubRESTClient implements GitHubClient {
+public class GitHubRESTClient implements GitHubClient<GitHubSchema> {
 
     private static final Log LOGGER = Log.getLog(GitHubRESTClient.class);
 
-    private final String instanceName;
     private final GitHubConfiguration configuration;
+    private String instanceName;
     private GitHubExt apiClient;
     private long lastAuthenticated;
     private GHOrganizationExt orgApiClient;
 
-    public GitHubRESTClient(String instanceName, GitHubConfiguration configuration) {
-        this.instanceName = instanceName;
+    public GitHubRESTClient(GitHubConfiguration configuration) {
         this.configuration = configuration;
 
         auth();
@@ -78,6 +68,11 @@ public class GitHubRESTClient implements GitHubClient {
 
     public GitHubExt getApiClient() {
         return apiClient;
+    }
+
+    @Override
+    public void setInstanceName(String instanceName) {
+        this.instanceName = instanceName;
     }
 
     @Override
@@ -92,35 +87,7 @@ public class GitHubRESTClient implements GitHubClient {
         }
     }
 
-    public OkHttpClient createClient() {
-        OkHttpClient.Builder okHttpBuilder = new OkHttpClient.Builder();
-        okHttpBuilder.connectTimeout(configuration.getConnectionTimeoutInMilliseconds(), TimeUnit.MILLISECONDS);
-        okHttpBuilder.readTimeout(configuration.getReadTimeoutInMilliseconds(), TimeUnit.MILLISECONDS);
-        okHttpBuilder.writeTimeout(configuration.getWriteTimeoutInMilliseconds(), TimeUnit.MILLISECONDS);
-
-        // Setup http proxy aware httpClient
-        if (StringUtil.isNotEmpty(configuration.getHttpProxyHost())) {
-            okHttpBuilder.proxy(new Proxy(Proxy.Type.HTTP,
-                    new InetSocketAddress(configuration.getHttpProxyHost(), configuration.getHttpProxyPort())));
-
-            if (StringUtil.isNotEmpty(configuration.getHttpProxyUser()) && configuration.getHttpProxyPassword() != null) {
-                configuration.getHttpProxyPassword().access(c -> {
-                    okHttpBuilder.proxyAuthenticator((Route route, Response response) -> {
-                        String credential = Credentials.basic(configuration.getHttpProxyUser(), String.valueOf(c));
-                        return response.request().newBuilder()
-                                .header("Proxy-Authorization", credential)
-                                .build();
-                    });
-                });
-            }
-        }
-
-        OkHttpClient httpClient = okHttpBuilder.build();
-
-        return httpClient;
-    }
-
-    private class UnauthorizedException extends ConnectionFailedException {
+    private static class UnauthorizedException extends ConnectionFailedException {
         public UnauthorizedException(Exception e) {
             super(e);
         }
@@ -137,7 +104,7 @@ public class GitHubRESTClient implements GitHubClient {
             // First, get app installation token
             GitHub api = new GitHubBuilder()
                     .withJwtToken(createJWT(configuration.getAppId(), 60000, privateKey.get()))
-                    .withConnector(new OkHttpConnector(createClient()))
+                    .withConnector(new OkHttpConnector(createClient(configuration)))
                     .build();
             GHAppInstallation appInstallation = api.getApp().getInstallationById(configuration.getInstallationId()); // Installation Id
 
@@ -146,7 +113,7 @@ public class GitHubRESTClient implements GitHubClient {
             // Then, get scoped access token by app installation token
 
             GitHubBuilder builder = new GitHubBuilder()
-                    .withConnector(new OkHttpConnector(createClient()))
+                    .withConnector(new OkHttpConnector(createClient(configuration)))
                     .withAppInstallationToken(appInstallationToken.getToken());
 
             apiClient = GitHubExt.build(builder);

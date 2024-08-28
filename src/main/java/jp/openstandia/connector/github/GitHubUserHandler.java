@@ -33,7 +33,7 @@ import static jp.openstandia.connector.github.GitHubUtils.*;
  *
  * @author Hiroyuki Wada
  */
-public class GitHubUserHandler extends AbstractGitHubHandler {
+public class GitHubUserHandler extends AbstractGitHubHandler<GitHubConfiguration, GitHubSchema> {
 
     public static final ObjectClass USER_OBJECT_CLASS = new ObjectClass("user");
 
@@ -62,9 +62,9 @@ public class GitHubUserHandler extends AbstractGitHubHandler {
     public static final String ATTR_TEAMS = "teams"; // List of teamId(databaseId:nodeId)
     public static final String ATTR_MAINTAINER_TEAMS = "maintainerTeams"; // List of teamId(databaseId:nodeId)
 
-    public GitHubUserHandler(String instanceName, GitHubConfiguration configuration, GitHubClient client,
+    public GitHubUserHandler(GitHubConfiguration configuration, GitHubClient<GitHubSchema> client,
                              GitHubSchema schema) {
-        super(instanceName, configuration, client, schema);
+        super(configuration, client, schema);
     }
 
     public static ObjectClassInfo getUserSchema() {
