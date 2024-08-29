@@ -19,6 +19,8 @@ public class SCIMPagedSearchIterable<T> extends PagedIterable<T> {
      * As soon as we have any result fetched, it's set here so that we can report the total count.
      */
     private SCIMSearchResult<T> result;
+    
+    private int pageOffset;
 
     public SCIMPagedSearchIterable(GitHub root, GitHubRequest request, Class<? extends SCIMSearchResult<T>> receiverType) {
         this.root = root;
@@ -29,6 +31,11 @@ public class SCIMPagedSearchIterable<T> extends PagedIterable<T> {
     @Override
     public SCIMPagedSearchIterable<T> withPageSize(int size) {
         return (SCIMPagedSearchIterable<T>) super.withPageSize(size);
+    }
+
+    public SCIMPagedSearchIterable<T> withPageOffset(int pageOffset) {
+        this.pageOffset = pageOffset;
+        return this;
     }
 
     /**
@@ -59,7 +66,7 @@ public class SCIMPagedSearchIterable<T> extends PagedIterable<T> {
     @Override
     public PagedIterator<T> _iterator(int pageSize) {
         final Iterator<T[]> adapter = adapt(
-                SCIMPageIterator.create(root.getClient(), receiverType, request, pageSize));
+                SCIMPageIterator.create(root.getClient(), receiverType, request, pageSize, pageOffset));
         return new PagedIterator<T>(adapter, null);
     }
 

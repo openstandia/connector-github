@@ -53,4 +53,17 @@ public class GitHubExt extends GitHub {
         GHOrganizationExt o = createRequest().withUrlPath("/orgs/" + name).fetch(GHOrganizationExt.class).wrapUp(this);
         return o;
     }
+
+    /**
+     * Returns GHEnterprise..
+     *
+     * @param name GitHub enterprise slug
+     * @return GitHub enterprise object
+     */
+    public GHEnterpriseExt getEnterprise(String name) {
+        GHEnterpriseExt enterprise = new GHEnterpriseExt();
+        enterprise.root = this;
+        enterprise.login = name;
+        return enterprise;
+    }
 }

@@ -1,5 +1,6 @@
 package jp.openstandia.connector.github.testutil;
 
+import jp.openstandia.connector.github.GitHubSchema;
 import jp.openstandia.connector.github.GitHubClient;
 import jp.openstandia.connector.github.GitHubSchema;
 import org.identityconnectors.framework.common.exceptions.AlreadyExistsException;
@@ -14,7 +15,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 
-public class MockClient implements GitHubClient {
+public class MockClient implements GitHubClient<GitHubSchema> {
 
     private static final MockClient INSTANCE = new MockClient();
 
@@ -26,6 +27,10 @@ public class MockClient implements GitHubClient {
     }
 
     public void init() {
+    }
+
+    @Override
+    public void setInstanceName(String instanceName) {
     }
 
     @Override
