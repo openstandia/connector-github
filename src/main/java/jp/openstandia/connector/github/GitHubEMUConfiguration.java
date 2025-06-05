@@ -28,6 +28,7 @@ public class GitHubEMUConfiguration extends AbstractGitHubConfiguration {
 
     private String enterpriseSlug;
     private GuardedString accessToken;
+    private String endpointURL;
 
     @ConfigurationProperty(
             order = 1,
@@ -55,6 +56,20 @@ public class GitHubEMUConfiguration extends AbstractGitHubConfiguration {
 
     public void setAccessToken(GuardedString accessToken) {
         this.accessToken = accessToken;
+    }
+
+    @ConfigurationProperty(
+            order = 3,
+            displayMessageKey = "Endpoint URL",
+            helpMessageKey = "Set GitHub endpoint URL (Default: https://api.github.com).",
+            required = false,
+            confidential = false)
+    public String getEndpointURL() {
+        return endpointURL;
+    }
+
+    public void setEndpointURL(String endpointURL) {
+        this.endpointURL = endpointURL;
     }
 
     @Override
