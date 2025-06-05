@@ -19,6 +19,7 @@ import jp.openstandia.connector.github.GitHubClient;
 import jp.openstandia.connector.github.GitHubEMUConfiguration;
 import jp.openstandia.connector.github.GitHubEMUSchema;
 import jp.openstandia.connector.util.QueryHandler;
+import org.identityconnectors.common.StringUtil;
 import org.identityconnectors.common.logging.Log;
 import org.identityconnectors.framework.common.exceptions.*;
 import org.identityconnectors.framework.common.objects.Name;
@@ -95,6 +96,10 @@ public class GitHubEMURESTClient implements GitHubClient<GitHubEMUSchema> {
             GitHubBuilder builder = new GitHubBuilder()
                     .withConnector(new OkHttpConnector(createClient(configuration)))
                     .withOAuthToken(accessToken.get());
+
+            if (!StringUtil.isEmpty(configuration.getEndpointURL())) {
+                builder = builder.withEndpoint(configuration.getEndpointURL());
+            }
 
             apiClient = GitHubExt.build(builder);
             lastAuthenticated = System.currentTimeMillis();
