@@ -25,6 +25,7 @@ public abstract class SCIMSearchBuilder<T> extends GHQueryBuilder<T> {
         req.withUrlPath(getApiUrl());
         req.withHeader(SCIMConstants.HEADER_ACCEPT, SCIMConstants.SCIM_ACCEPT);
         req.withHeader(SCIMConstants.HEADER_API_VERSION, SCIMConstants.GITHUB_API_VERSION);
+        req.rateLimit(RateLimitTarget.SEARCH);
     }
 
     SCIMSearchBuilder(GitHub root, GHEnterpriseExt enterprise, Class<? extends SCIMSearchResult<T>> receiverType) {
@@ -35,6 +36,7 @@ public abstract class SCIMSearchBuilder<T> extends GHQueryBuilder<T> {
         req.withUrlPath(getApiUrl());
         req.withHeader(SCIMConstants.HEADER_ACCEPT, SCIMConstants.SCIM_ACCEPT);
         req.withHeader(SCIMConstants.HEADER_API_VERSION, SCIMConstants.GITHUB_API_VERSION);
+        req.rateLimit(RateLimitTarget.SEARCH);
     }
 
     /**
