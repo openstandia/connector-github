@@ -1,3 +1,10 @@
+## [1.2.2](https://github.com/openstandia/connector-github/compare/v1.2.1...v1.2.2) (2025-06-14)
+
+
+### Bug Fixes
+
+* use lowercase 't' in Content-type header to prevent GitHub API override ([c9f065b](https://github.com/openstandia/connector-github/commit/c9f065b4bab896310e74772eb70935438aff170b))
+
 ## [1.2.1](https://github.com/openstandia/connector-github/compare/v1.2.0...v1.2.1) (2025-06-14)
 
 
