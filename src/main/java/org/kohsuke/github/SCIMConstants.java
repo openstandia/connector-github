@@ -14,4 +14,7 @@ public final class SCIMConstants {
     public static final String HEADER_CONTENT_TYPE = "Content-Type";
     public static final String HEADER_ACCEPT = "Accept";
     public static final String HEADER_API_VERSION = "X-GitHub-Api-Version";
+
+    public static final String SCIM_USER_SCHEMA = "urn:ietf:params:scim:schemas:core:2.0:User";
+    public static final String SCIM_GROUP_SCHEMA = "urn:ietf:params:scim:schemas:core:2.0:Group";
 }

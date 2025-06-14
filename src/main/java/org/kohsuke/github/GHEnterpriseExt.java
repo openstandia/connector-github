@@ -20,6 +20,8 @@ public class GHEnterpriseExt extends GHOrganization {
     }
 
     public SCIMEMUUser createSCIMEMUUser(SCIMEMUUser newUser) throws IOException {
+        newUser.schemas = new String[]{SCIMConstants.SCIM_USER_SCHEMA};
+
         String json = mapper.writeValueAsString(newUser);
         byte[] jsonBytes = json.getBytes();
 
@@ -95,6 +97,8 @@ public class GHEnterpriseExt extends GHOrganization {
     }
 
     public SCIMEMUGroup createSCIMEMUGroup(SCIMEMUGroup newGroup) throws IOException {
+        newGroup.schemas = new String[]{SCIMConstants.SCIM_GROUP_SCHEMA};
+
         String json = mapper.writeValueAsString(newGroup);
         byte[] jsonBytes = json.getBytes();
 
