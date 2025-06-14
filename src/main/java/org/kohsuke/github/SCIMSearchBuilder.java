@@ -23,7 +23,8 @@ public abstract class SCIMSearchBuilder<T> extends GHQueryBuilder<T> {
         this.organization = org;
         this.receiverType = receiverType;
         req.withUrlPath(getApiUrl());
-        req.rateLimit(RateLimitTarget.SEARCH);
+        req.withHeader(SCIMConstants.HEADER_ACCEPT, SCIMConstants.SCIM_ACCEPT);
+        req.withHeader(SCIMConstants.HEADER_API_VERSION, SCIMConstants.GITHUB_API_VERSION);
     }
 
     SCIMSearchBuilder(GitHub root, GHEnterpriseExt enterprise, Class<? extends SCIMSearchResult<T>> receiverType) {
@@ -32,7 +33,8 @@ public abstract class SCIMSearchBuilder<T> extends GHQueryBuilder<T> {
         this.organization = null;
         this.receiverType = receiverType;
         req.withUrlPath(getApiUrl());
-        req.rateLimit(RateLimitTarget.SEARCH);
+        req.withHeader(SCIMConstants.HEADER_ACCEPT, SCIMConstants.SCIM_ACCEPT);
+        req.withHeader(SCIMConstants.HEADER_API_VERSION, SCIMConstants.GITHUB_API_VERSION);
     }
 
     /**

@@ -46,6 +46,8 @@ public class GHOrganizationExt extends GHOrganization {
 
         SCIMUser u = root.createRequest()
                 .method("POST")
+                .withHeader(SCIMConstants.HEADER_ACCEPT, SCIMConstants.SCIM_ACCEPT)
+                .withHeader(SCIMConstants.GITHUB_API_VERSION, SCIMConstants.GITHUB_API_VERSION)
                 .with(map)
                 .withUrlPath(String.format("/scim/v2/organizations/%s/Users", login))
                 .fetch(SCIMUser.class);
@@ -81,6 +83,8 @@ public class GHOrganizationExt extends GHOrganization {
 
         SCIMUser u = root.createRequest()
                 .method("PATCH")
+                .withHeader(SCIMConstants.HEADER_ACCEPT, SCIMConstants.SCIM_ACCEPT)
+                .withHeader(SCIMConstants.GITHUB_API_VERSION, SCIMConstants.GITHUB_API_VERSION)
                 .with(map)
                 .withUrlPath(String.format("/scim/v2/organizations/%s/Users/%s", login, scimUserId))
                 .fetch(SCIMUser.class);
@@ -89,6 +93,8 @@ public class GHOrganizationExt extends GHOrganization {
 
     public SCIMUser getSCIMUser(String scimUserId) throws IOException {
         SCIMUser u = root.createRequest()
+                .withHeader(SCIMConstants.HEADER_ACCEPT, SCIMConstants.SCIM_ACCEPT)
+                .withHeader(SCIMConstants.GITHUB_API_VERSION, SCIMConstants.GITHUB_API_VERSION)
                 .withUrlPath(String.format("/scim/v2/organizations/%s/Users/%s", login, scimUserId))
                 .fetch(SCIMUser.class);
         return u;
@@ -96,6 +102,8 @@ public class GHOrganizationExt extends GHOrganization {
 
     public SCIMUser getSCIMUserByUserName(String scimUserName) throws IOException {
         SCIMUser u = root.createRequest()
+                .withHeader(SCIMConstants.HEADER_ACCEPT, SCIMConstants.SCIM_ACCEPT)
+                .withHeader(SCIMConstants.GITHUB_API_VERSION, SCIMConstants.GITHUB_API_VERSION)
                 .withUrlPath(String.format("/scim/v2/organizations/%s/Users?filter=userName eq \"%s\"", login, scimUserName))
                 .fetch(SCIMUser.class);
         return u;
@@ -132,6 +140,8 @@ public class GHOrganizationExt extends GHOrganization {
     public void deleteSCIMUser(String scimUserId) throws IOException {
         root.createRequest()
                 .method("DELETE")
+                .withHeader(SCIMConstants.HEADER_ACCEPT, SCIMConstants.SCIM_ACCEPT)
+                .withHeader(SCIMConstants.GITHUB_API_VERSION, SCIMConstants.GITHUB_API_VERSION)
                 .withUrlPath(String.format("/scim/v2/organizations/%s/Users/%s", login, scimUserId))
                 .send();
     }

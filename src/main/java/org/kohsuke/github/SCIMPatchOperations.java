@@ -12,6 +12,7 @@ import java.util.stream.Collectors;
 public class SCIMPatchOperations {
     private static final String PATCH_OP = "urn:ietf:params:scim:api:messages:2.0:PatchOp";
 
+    @JsonProperty("schemas")
     public List<String> schemas = Collections.singletonList(PATCH_OP);
 
     @JsonProperty("Operations")

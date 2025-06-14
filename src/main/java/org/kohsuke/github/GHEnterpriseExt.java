@@ -20,12 +20,17 @@ public class GHEnterpriseExt extends GHOrganization {
     }
 
     public SCIMEMUUser createSCIMEMUUser(SCIMEMUUser newUser) throws IOException {
+        newUser.schemas = new String[]{SCIMConstants.SCIM_USER_SCHEMA};
+
         String json = mapper.writeValueAsString(newUser);
         byte[] jsonBytes = json.getBytes();
 
         try (InputStream inputStream = new ByteArrayInputStream(jsonBytes)) {
             SCIMEMUUser u = root.createRequest()
                     .method("POST")
+                    .withHeader(SCIMConstants.HEADER_CONTENT_TYPE, SCIMConstants.SCIM_CONTENT_TYPE)
+                    .withHeader(SCIMConstants.HEADER_ACCEPT, SCIMConstants.SCIM_ACCEPT)
+                    .withHeader(SCIMConstants.HEADER_API_VERSION, SCIMConstants.GITHUB_API_VERSION)
                     .with(inputStream)
                     .withUrlPath(String.format("/scim/v2/enterprises/%s/Users", login))
                     .fetch(SCIMEMUUser.class);
@@ -40,6 +45,9 @@ public class GHEnterpriseExt extends GHOrganization {
         try (InputStream inputStream = new ByteArrayInputStream(jsonBytes)) {
             SCIMEMUUser u = root.createRequest()
                     .method("PATCH")
+                    .withHeader(SCIMConstants.HEADER_CONTENT_TYPE, SCIMConstants.SCIM_CONTENT_TYPE)
+                    .withHeader(SCIMConstants.HEADER_ACCEPT, SCIMConstants.SCIM_ACCEPT)
+                    .withHeader(SCIMConstants.HEADER_API_VERSION, SCIMConstants.GITHUB_API_VERSION)
                     .with(inputStream)
                     .withUrlPath(String.format("/scim/v2/enterprises/%s/Users/%s", login, scimUserId))
                     .fetch(SCIMEMUUser.class);
@@ -49,6 +57,8 @@ public class GHEnterpriseExt extends GHOrganization {
 
     public SCIMEMUUser getSCIMEMUUser(String scimUserId) throws IOException {
         SCIMEMUUser u = root.createRequest()
+                .withHeader(SCIMConstants.HEADER_ACCEPT, SCIMConstants.SCIM_ACCEPT)
+                .withHeader(SCIMConstants.HEADER_API_VERSION, SCIMConstants.GITHUB_API_VERSION)
                 .withUrlPath(String.format("/scim/v2/enterprises/%s/Users/%s", login, scimUserId))
                 .fetch(SCIMEMUUser.class);
         return u;
@@ -56,6 +66,8 @@ public class GHEnterpriseExt extends GHOrganization {
 
     public SCIMEMUUser getSCIMEMUUserByUserName(String scimUserName) throws IOException {
         SCIMEMUUser u = root.createRequest()
+                .withHeader(SCIMConstants.HEADER_ACCEPT, SCIMConstants.SCIM_ACCEPT)
+                .withHeader(SCIMConstants.HEADER_API_VERSION, SCIMConstants.GITHUB_API_VERSION)
                 .withUrlPath(String.format("/scim/v2/enterprises/%s/Users?filter=userName eq \"%s\"", login, scimUserName))
                 .fetch(SCIMEMUUser.class);
         return u;
@@ -78,17 +90,24 @@ public class GHEnterpriseExt extends GHOrganization {
     public void deleteSCIMUser(String scimUserId) throws IOException {
         root.createRequest()
                 .method("DELETE")
+                .withHeader(SCIMConstants.HEADER_ACCEPT, SCIMConstants.SCIM_ACCEPT)
+                .withHeader(SCIMConstants.HEADER_API_VERSION, SCIMConstants.GITHUB_API_VERSION)
                 .withUrlPath(String.format("/scim/v2/enterprises/%s/Users/%s", login, scimUserId))
                 .send();
     }
 
     public SCIMEMUGroup createSCIMEMUGroup(SCIMEMUGroup newGroup) throws IOException {
+        newGroup.schemas = new String[]{SCIMConstants.SCIM_GROUP_SCHEMA};
+
         String json = mapper.writeValueAsString(newGroup);
         byte[] jsonBytes = json.getBytes();
 
         try (InputStream inputStream = new ByteArrayInputStream(jsonBytes)) {
             SCIMEMUGroup g = root.createRequest()
                     .method("POST")
+                    .withHeader(SCIMConstants.HEADER_CONTENT_TYPE, SCIMConstants.SCIM_CONTENT_TYPE)
+                    .withHeader(SCIMConstants.HEADER_ACCEPT, SCIMConstants.SCIM_ACCEPT)
+                    .withHeader(SCIMConstants.HEADER_API_VERSION, SCIMConstants.GITHUB_API_VERSION)
                     .with(inputStream)
                     .withUrlPath(String.format("/scim/v2/enterprises/%s/Groups", login))
                     .fetch(SCIMEMUGroup.class);
@@ -103,6 +122,9 @@ public class GHEnterpriseExt extends GHOrganization {
         try (InputStream inputStream = new ByteArrayInputStream(jsonBytes)) {
             SCIMEMUGroup g = root.createRequest()
                     .method("PATCH")
+                    .withHeader(SCIMConstants.HEADER_CONTENT_TYPE, SCIMConstants.SCIM_CONTENT_TYPE)
+                    .withHeader(SCIMConstants.HEADER_ACCEPT, SCIMConstants.SCIM_ACCEPT)
+                    .withHeader(SCIMConstants.HEADER_API_VERSION, SCIMConstants.GITHUB_API_VERSION)
                     .with(inputStream)
                     .withUrlPath(String.format("/scim/v2/enterprises/%s/Groups/%s", login, scimGroupId))
                     .fetch(SCIMEMUGroup.class);
@@ -112,6 +134,8 @@ public class GHEnterpriseExt extends GHOrganization {
 
     public SCIMEMUGroup getSCIMEMUGroup(String scimGroupId) throws IOException {
         SCIMEMUGroup g = root.createRequest()
+                .withHeader(SCIMConstants.HEADER_ACCEPT, SCIMConstants.SCIM_ACCEPT)
+                .withHeader(SCIMConstants.HEADER_API_VERSION, SCIMConstants.GITHUB_API_VERSION)
                 .withUrlPath(String.format("/scim/v2/enterprises/%s/Groups/%s", login, scimGroupId))
                 .fetch(SCIMEMUGroup.class);
         return g;
@@ -119,6 +143,8 @@ public class GHEnterpriseExt extends GHOrganization {
 
     public SCIMEMUGroup getSCIMEMUGroupByDisplayName(String scimGroupDisplayName) throws IOException {
         SCIMEMUGroup g = root.createRequest()
+                .withHeader(SCIMConstants.HEADER_ACCEPT, SCIMConstants.SCIM_ACCEPT)
+                .withHeader(SCIMConstants.HEADER_API_VERSION, SCIMConstants.GITHUB_API_VERSION)
                 .withUrlPath(String.format("/scim/v2/enterprises/%s/Groups?filter=displayName eq \"%s\"", login, scimGroupDisplayName))
                 .fetch(SCIMEMUGroup.class);
         return g;
@@ -141,6 +167,8 @@ public class GHEnterpriseExt extends GHOrganization {
     public void deleteSCIMGroup(String scimGroupId) throws IOException {
         root.createRequest()
                 .method("DELETE")
+                .withHeader(SCIMConstants.HEADER_ACCEPT, SCIMConstants.SCIM_ACCEPT)
+                .withHeader(SCIMConstants.HEADER_API_VERSION, SCIMConstants.GITHUB_API_VERSION)
                 .withUrlPath(String.format("/scim/v2/enterprises/%s/Groups/%s", login, scimGroupId))
                 .send();
     }
