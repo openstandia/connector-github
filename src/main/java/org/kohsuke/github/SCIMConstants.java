@@ -11,7 +11,9 @@ public final class SCIMConstants {
     public static final String SCIM_ACCEPT = "application/scim+json";
     public static final String GITHUB_API_VERSION = "2022-11-28";
     
-    public static final String HEADER_CONTENT_TYPE = "Content-Type";
+    // Be careful, as it will be overwritten by the following if we use Content-Type.
+    // https://github.com/hub4j/github-api/blob/github-api-1.122/src/main/java/org/kohsuke/github/GitHubHttpUrlConnectionClient.java#L141-L142
+    public static final String HEADER_CONTENT_TYPE = "Content-type";
     public static final String HEADER_ACCEPT = "Accept";
     public static final String HEADER_API_VERSION = "X-GitHub-Api-Version";
 
