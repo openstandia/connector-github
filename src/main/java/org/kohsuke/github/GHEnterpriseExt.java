@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.List;
 
 /**
  * GHEnterprise class.
@@ -65,12 +66,14 @@ public class GHEnterpriseExt extends GHOrganization {
     }
 
     public SCIMEMUUser getSCIMEMUUserByUserName(String scimUserName) throws IOException {
-        SCIMEMUUser u = root.createRequest()
-                .withHeader(SCIMConstants.HEADER_ACCEPT, SCIMConstants.SCIM_ACCEPT)
-                .withHeader(SCIMConstants.HEADER_API_VERSION, SCIMConstants.GITHUB_API_VERSION)
-                .withUrlPath(String.format("/scim/v2/enterprises/%s/Users?filter=userName eq \"%s\"", login, scimUserName))
-                .fetch(SCIMEMUUser.class);
-        return u;
+        List<SCIMEMUUser> list = searchSCIMUsers()
+                .eq("userName", scimUserName)
+                .list()
+                .toList();
+        if (list.size() != 1) {
+            return null;
+        }
+        return list.get(0);
     }
 
     /**
@@ -142,12 +145,14 @@ public class GHEnterpriseExt extends GHOrganization {
     }
 
     public SCIMEMUGroup getSCIMEMUGroupByDisplayName(String scimGroupDisplayName) throws IOException {
-        SCIMEMUGroup g = root.createRequest()
-                .withHeader(SCIMConstants.HEADER_ACCEPT, SCIMConstants.SCIM_ACCEPT)
-                .withHeader(SCIMConstants.HEADER_API_VERSION, SCIMConstants.GITHUB_API_VERSION)
-                .withUrlPath(String.format("/scim/v2/enterprises/%s/Groups?filter=displayName eq \"%s\"", login, scimGroupDisplayName))
-                .fetch(SCIMEMUGroup.class);
-        return g;
+        List<SCIMEMUGroup> list = searchSCIMGroups()
+                .eq("displayName", scimGroupDisplayName)
+                .list()
+                .toList();
+        if (list.size() != 1) {
+            return null;
+        }
+        return list.get(0);
     }
 
     /**

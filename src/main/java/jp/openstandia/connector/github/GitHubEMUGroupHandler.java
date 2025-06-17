@@ -25,6 +25,7 @@ import org.kohsuke.github.SCIMPatchOperations;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static jp.openstandia.connector.util.Utils.toZoneDateTimeForISO8601OffsetDateTime;
 import static org.identityconnectors.framework.common.objects.AttributeInfo.Flags.*;
@@ -96,7 +97,7 @@ public class GitHubEMUGroupHandler extends AbstractGitHubEMUHandler {
                 },
                 (add, dest) -> dest.addMembers(add),
                 (remove, dest) -> dest.removeMembers(remove),
-                (source) -> source.members.stream().filter(x -> x.ref.contains("/Users/")).map(x -> x.value),
+                (source) -> source.members != null ? source.members.stream().filter(x -> x.ref.contains("/Users/")).map(x -> x.value) : Stream.empty(),
                 null
         );
 
@@ -104,14 +105,14 @@ public class GitHubEMUGroupHandler extends AbstractGitHubEMUHandler {
         sb.add("meta.created",
                 SchemaDefinition.Types.DATETIME,
                 null,
-                (source) -> toZoneDateTimeForISO8601OffsetDateTime(source.meta.created),
+                (source) -> source.meta != null ? toZoneDateTimeForISO8601OffsetDateTime(source.meta.created) : null,
                 null,
                 NOT_CREATABLE, NOT_UPDATEABLE
         );
         sb.add("meta.lastModified",
                 SchemaDefinition.Types.DATETIME,
                 null,
-                (source) -> toZoneDateTimeForISO8601OffsetDateTime(source.meta.lastModified),
+                (source) -> source.meta != null ? toZoneDateTimeForISO8601OffsetDateTime(source.meta.lastModified) : null,
                 null,
                 NOT_CREATABLE, NOT_UPDATEABLE
         );
@@ -166,10 +167,10 @@ public class GitHubEMUGroupHandler extends AbstractGitHubEMUHandler {
     public int getByName(Name name, ResultsHandler resultsHandler, OperationOptions options,
                          Set<String> returnAttributesSet, Set<String> fetchFieldsSet,
                          boolean allowPartialAttributeValues, int pageSize, int pageOffset) {
-        SCIMEMUGroup user = client.getEMUGroup(name, options, fetchFieldsSet);
+        SCIMEMUGroup group = client.getEMUGroup(name, options, fetchFieldsSet);
 
-        if (user != null) {
-            resultsHandler.handle(toConnectorObject(schemaDefinition, user, returnAttributesSet, allowPartialAttributeValues));
+        if (group != null) {
+            resultsHandler.handle(toConnectorObject(schemaDefinition, group, returnAttributesSet, allowPartialAttributeValues));
             return 1;
         }
         return 0;

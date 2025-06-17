@@ -22,6 +22,7 @@ import org.kohsuke.github.*;
 
 import java.util.ArrayList;
 import java.util.Set;
+import java.util.stream.Stream;
 
 import static jp.openstandia.connector.util.Utils.toZoneDateTimeForISO8601OffsetDateTime;
 import static org.identityconnectors.framework.common.objects.AttributeInfo.Flags.*;
@@ -200,7 +201,7 @@ public class GitHubEMUUserHandler extends AbstractGitHubEMUHandler {
                 null,
                 null,
                 null,
-                (source) -> source.groups.stream().filter(x -> x.ref.contains("/Groups/")).map(x -> x.value),
+                (source) -> source.groups != null ? source.groups.stream().filter(x -> x.ref.contains("/Groups/")).map(x -> x.value) : Stream.empty(),
                 null,
                 NOT_CREATABLE, NOT_UPDATEABLE, NOT_RETURNED_BY_DEFAULT
         );
@@ -209,14 +210,14 @@ public class GitHubEMUUserHandler extends AbstractGitHubEMUHandler {
         sb.add("meta.created",
                 SchemaDefinition.Types.DATETIME,
                 null,
-                (source) -> toZoneDateTimeForISO8601OffsetDateTime(source.meta.created),
+                (source) -> source.meta != null ? toZoneDateTimeForISO8601OffsetDateTime(source.meta.created) : null,
                 null,
                 NOT_CREATABLE, NOT_UPDATEABLE
         );
         sb.add("meta.lastModified",
                 SchemaDefinition.Types.DATETIME,
                 null,
-                (source) -> toZoneDateTimeForISO8601OffsetDateTime(source.meta.lastModified),
+                (source) -> source.meta != null ? toZoneDateTimeForISO8601OffsetDateTime(source.meta.lastModified) : null,
                 null,
                 NOT_CREATABLE, NOT_UPDATEABLE
         );
