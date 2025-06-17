@@ -1,3 +1,10 @@
+## [1.2.3](https://github.com/openstandia/connector-github/compare/v1.2.2...v1.2.3) (2025-06-17)
+
+
+### Bug Fixes
+
+* can't fetch user/group by NAME ([4c8e5ac](https://github.com/openstandia/connector-github/commit/4c8e5ac32f8809c5593bc796c97dc62b46b6a13f))
+
 ## [1.2.2](https://github.com/openstandia/connector-github/compare/v1.2.1...v1.2.2) (2025-06-14)
 
 
