@@ -1,3 +1,10 @@
+## [1.2.4](https://github.com/openstandia/connector-github/compare/v1.2.3...v1.2.4) (2025-07-01)
+
+
+### Bug Fixes
+
+* handle GitHub SCIM empty array limitation ([468a86a](https://github.com/openstandia/connector-github/commit/468a86a22f1ff9119e9b53c1da98d13d1ff61842))
+
 ## [1.2.3](https://github.com/openstandia/connector-github/compare/v1.2.2...v1.2.3) (2025-06-17)
 
 
